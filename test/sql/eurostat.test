@@ -16,8 +16,3 @@ query I
 SELECT eurostat('Sam');
 ----
 Eurostat Sam 🐥
-
-query I
-SELECT eurostat_openssl_version('Michael') ILIKE 'Eurostat Michael, my linked OpenSSL version is OpenSSL%';
-----
-true
