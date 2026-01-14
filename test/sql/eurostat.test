@@ -1,0 +1,23 @@
+# name: test/sql/eurostat.test
+# description: test eurostat extension
+# group: [sql]
+
+# Before we load the extension, this will fail
+statement error
+SELECT eurostat('Sam');
+----
+Catalog Error: Scalar Function with name eurostat does not exist!
+
+# Require statement will ensure this test is run with this extension loaded
+require eurostat
+
+# Confirm the extension works
+query I
+SELECT eurostat('Sam');
+----
+Eurostat Sam 🐥
+
+query I
+SELECT eurostat_openssl_version('Michael') ILIKE 'Eurostat Michael, my linked OpenSSL version is OpenSSL%';
+----
+true
