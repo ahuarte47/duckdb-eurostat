@@ -1,0 +1,21 @@
+# name: test/sql/eurostat_endpoints.test
+# description: test eurostat extension
+# group: [sql]
+
+require eurostat
+
+query II
+SELECT
+    provider_id,
+    api_url
+FROM
+    EUROSTAT_Endpoints()
+ORDER BY
+    provider_id
+;
+----
+ECFIN	https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1/
+EMPL	https://webgate.ec.europa.eu/empl/redisstat/api/dissemination/sdmx/2.1/
+ESTAT	https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/
+GROW	https://webgate.ec.europa.eu/grow/redisstat/api/dissemination/sdmx/2.1/
+TAXUD	https://webgate.ec.europa.eu/taxation_customs/redisstat/api/dissemination/sdmx/2.1/

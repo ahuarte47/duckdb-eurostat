@@ -4,15 +4,15 @@
 
 # Before we load the extension, this will fail
 statement error
-SELECT eurostat('Sam');
+SELECT * FROM EUROSTAT_Endpoints();
 ----
-Catalog Error: Scalar Function with name eurostat does not exist!
+Catalog Error: Table Function with name eurostat_endpoints does not exist!
 
 # Require statement will ensure this test is run with this extension loaded
 require eurostat
 
 # Confirm the extension works
 query I
-SELECT eurostat('Sam');
+SELECT count(*) FROM EUROSTAT_Endpoints()
 ----
-Eurostat Sam 🐥
+5

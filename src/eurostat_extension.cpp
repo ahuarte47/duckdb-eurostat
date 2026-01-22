@@ -6,20 +6,14 @@
 #include "duckdb/function/scalar_function.hpp"
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
+// EUROSTAT
+#include "eurostat/eurostat_info_functions.hpp"
+
 namespace duckdb {
 
-inline void EurostatScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-	auto &name_vector = args.data[0];
-	UnaryExecutor::Execute<string_t, string_t>(name_vector, result, args.size(), [&](string_t name) {
-		return StringVector::AddString(result, "Eurostat " + name.GetString() + " 🐥");
-	});
-}
-
 static void LoadInternal(ExtensionLoader &loader) {
-	// Register a scalar function
-	auto eurostat_scalar_function =
-	    ScalarFunction("eurostat", {LogicalType::VARCHAR}, LogicalType::VARCHAR, EurostatScalarFun);
-	loader.RegisterFunction(eurostat_scalar_function);
+	// Register functions
+	EurostatInfoFunctions::Register(loader);
 }
 
 void EurostatExtension::Load(ExtensionLoader &loader) {

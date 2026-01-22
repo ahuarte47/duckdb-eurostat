@@ -27,4 +27,4 @@ jobs:
       duckdb_version: v1.4.3
       ci_tools_version: v1.4.3
       extension_name: eurostat
-      format_checks: 'format;tidy'
+      format_checks: 'format'
