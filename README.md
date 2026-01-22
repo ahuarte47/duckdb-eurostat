@@ -53,6 +53,36 @@ This is the list of available functions:
 	└─────────────┴──────────────┴──────────────────────────────────────────────────────┘
     ```
 
++ ### EUROSTAT_Dataflows()
+
+    Returns info of the dataflows provided by EUROSTAT Providers.
+
+    ```sql
+	SELECT * FROM EUROSTAT_Dataflows();
+	SELECT * FROM EUROSTAT_Dataflows(providers = ['ESTAT','ECFIN'], language = 'en');
+	```
+
+	You can also filter by specific dataflows:
+
+	```sql
+	SELECT
+		provider_id,
+		dataflow_id,
+		class,
+		version,
+		label
+	FROM
+		EUROSTAT_Dataflows(providers = ['ESTAT'], dataflows = ['DEMO_R_D2JAN'], language = 'de')
+	;
+
+	┌─────────────┬──────────────┬─────────┬─────────┬───────────────────────────────────────────────────────────────────┐
+	│ provider_id │  dataflow_id │  class  │ version │                               label                               │
+	│   varchar   │   varchar    │ varchar │ varchar │                              varchar                              │
+	├─────────────┼──────────────┼─────────┼─────────┼───────────────────────────────────────────────────────────────────┤
+	│ ESTAT       │ DEMO_R_D2JAN │ dataset │ 1.0     │ Bevölkerung am 1. Januar nach Alter, Geschlecht und NUTS-2-Region │
+	└─────────────┴──────────────┴─────────┴─────────┴───────────────────────────────────────────────────────────────────┘
+    ```
+
 ### Supported Functions and Documentation
 
 The full list of functions and their documentation is available in the [function reference](docs/functions.md)

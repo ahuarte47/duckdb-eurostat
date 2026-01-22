@@ -1,0 +1,14 @@
+# name: test/sql/eurostat_dataflows.test
+# description: test eurostat extension
+# group: [sql]
+
+require eurostat
+
+query II
+SELECT
+    provider_id,
+    dataflow_id
+FROM
+    EUROSTAT_Dataflows(providers := ['ESTAT'], dataflows := ['DEMO_R_D2JAN'], language := 'en')
+----
+ESTAT	DEMO_R_D2JAN

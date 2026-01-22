@@ -126,6 +126,505 @@ struct ES_Endpoints {
 	}
 };
 
+//======================================================================================================================
+// ES_Dataflows
+//======================================================================================================================
+
+struct ES_Dataflows {
+
+	//! Metadata of an EUROSTAT Dataflow
+	struct DataflowInfo {
+		string provider_id;
+		string dataflow_id;
+		string type;
+		string version;
+		string label;
+		string language;
+
+		int64_t number_of_values = -1;
+		int32_t data_start = -1;
+		int32_t data_end = -1;
+		string update_data;
+		string update_structure;
+
+		string data_structure;
+		string annotations;
+	};
+
+	//! Parse DataflowInfo from JSON object
+	inline static DataflowInfo ParseDataflowInfo(const string &provider_id, yyjson_val *object_val) {
+
+		yyjson_val *extension_val = nullptr;
+		yyjson_val *annotation_val = nullptr;
+		yyjson_val *attrib_val = nullptr;
+
+		if (!yyjson_is_obj(extension_val = yyjson_obj_get(object_val, "extension"))) {
+			throw InvalidInputException(
+			    "Invalid EUROSTAT dataflow metadata: missing or incorrect 'extension' attribute.");
+		}
+		if (!yyjson_is_arr(annotation_val = yyjson_obj_get(extension_val, "annotation"))) {
+			throw InvalidInputException(
+			    "Invalid EUROSTAT dataflow metadata: missing or incorrect 'extension/annotation' attribute.");
+		}
+
+		// Extract main attributes
+
+		DataflowInfo info;
+		info.provider_id = provider_id;
+
+		if (yyjson_is_str(attrib_val = yyjson_obj_get(extension_val, "id"))) {
+			info.dataflow_id = string(yyjson_get_str(attrib_val));
+		}
+		if (yyjson_is_str(attrib_val = yyjson_obj_get(object_val, "class"))) {
+			info.type = string(yyjson_get_str(attrib_val));
+		}
+		if (yyjson_is_str(attrib_val = yyjson_obj_get(extension_val, "version"))) {
+			info.version = string(yyjson_get_str(attrib_val));
+		}
+		if (yyjson_is_str(attrib_val = yyjson_obj_get(object_val, "label"))) {
+			info.label = string(yyjson_get_str(attrib_val));
+		}
+		if (yyjson_is_str(attrib_val = yyjson_obj_get(extension_val, "lang"))) {
+			info.language = string(yyjson_get_str(attrib_val));
+		}
+
+		if (yyjson_is_obj(attrib_val = yyjson_obj_get(extension_val, "datastructure"))) {
+			const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
+			if (json) {
+				info.data_structure = string(json);
+				free((void *)json);
+			}
+		}
+		if (yyjson_is_arr(attrib_val = yyjson_obj_get(extension_val, "annotation"))) {
+			const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
+			if (json) {
+				info.annotations = string(json);
+				free((void *)json);
+			}
+		}
+
+		// Extract attributes from annotations
+
+		auto annotation_len = yyjson_arr_size(annotation_val);
+
+		for (size_t i = 0; i < annotation_len; i++) {
+			auto elem_val = yyjson_arr_get(annotation_val, i);
+
+			if (!yyjson_is_obj(elem_val)) {
+				continue;
+			}
+
+			auto type_val = yyjson_obj_get(elem_val, "type");
+
+			if (!yyjson_is_str(type_val)) {
+				continue;
+			}
+
+			auto key = yyjson_get_str(type_val);
+
+			if (StringUtil::Equals(key, "OBS_COUNT")) {
+				auto key_val = yyjson_obj_get(elem_val, "title");
+
+				if (yyjson_is_str(key_val)) {
+					auto val = yyjson_get_str(key_val);
+					info.number_of_values = val ? std::stoll(val) : -1;
+				}
+			} else if (StringUtil::Equals(key, "OBS_PERIOD_OVERALL_OLDEST")) {
+				auto key_val = yyjson_obj_get(elem_val, "title");
+
+				if (yyjson_is_str(key_val)) {
+					auto val = yyjson_get_str(key_val);
+					info.data_start = val ? std::stoi(val) : -1;
+				}
+			} else if (StringUtil::Equals(key, "OBS_PERIOD_OVERALL_LATEST")) {
+				auto key_val = yyjson_obj_get(elem_val, "title");
+
+				if (yyjson_is_str(key_val)) {
+					auto val = yyjson_get_str(key_val);
+					info.data_end = val ? std::stoi(val) : -1;
+				}
+			} else if (StringUtil::Equals(key, "UPDATE_DATA")) {
+				auto key_val = yyjson_obj_get(elem_val, "date");
+
+				if (yyjson_is_str(key_val)) {
+					auto val = yyjson_get_str(key_val);
+					info.update_data = val ? string(val) : "";
+				}
+			} else if (StringUtil::Equals(key, "UPDATE_STRUCTURE")) {
+				auto key_val = yyjson_obj_get(elem_val, "date");
+
+				if (yyjson_is_str(key_val)) {
+					auto val = yyjson_get_str(key_val);
+					info.update_structure = val ? string(val) : "";
+				}
+			}
+		}
+
+		return info;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Bind
+	//------------------------------------------------------------------------------------------------------------------
+
+	struct BindData final : TableFunctionData {
+		std::vector<DataflowInfo> rows;
+		explicit BindData(const std::vector<DataflowInfo> &rows) : rows(std::move(rows)) {
+		}
+	};
+
+	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
+	                                     vector<LogicalType> &return_types, vector<string> &names) {
+
+		std::vector<string> providers;
+		std::vector<string> dataflows;
+		string language = "en";
+
+		names.emplace_back("provider_id");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("dataflow_id");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("class");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("version");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("label");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("language");
+		return_types.push_back(LogicalType::VARCHAR);
+
+		names.emplace_back("number_of_values");
+		return_types.push_back(LogicalType::BIGINT);
+		names.emplace_back("data_start");
+		return_types.push_back(LogicalType::INTEGER);
+		names.emplace_back("data_end");
+		return_types.push_back(LogicalType::INTEGER);
+
+		names.emplace_back("update_data");
+		return_types.push_back(LogicalType::TIMESTAMP_TZ);
+		names.emplace_back("update_structure");
+		return_types.push_back(LogicalType::TIMESTAMP_TZ);
+
+		names.emplace_back("data_structure");
+		return_types.push_back(LogicalType::JSON());
+		names.emplace_back("annotations");
+		return_types.push_back(LogicalType::JSON());
+
+		// Extract desired API Endpoints from named parameters
+
+		auto options_param = input.named_parameters.find("providers");
+
+		if (options_param != input.named_parameters.end()) {
+			auto &items = options_param->second;
+
+			if (!items.IsNull() && items.type() == LogicalType::LIST(LogicalType::VARCHAR)) {
+				for (const auto &item : ListValue::GetChildren(items)) {
+					auto value = item.GetValue<string>();
+
+					// Validate Endpoint name
+					if (eurostat::ENDPOINTS.find(value) == eurostat::ENDPOINTS.end()) {
+						throw InvalidInputException("Unknown EUROSTAT Endpoint '%s'.", value);
+					}
+					providers.push_back(value);
+				}
+			}
+		}
+		if (providers.empty()) {
+			for (const auto &it : eurostat::ENDPOINTS) {
+				providers.push_back(it.first);
+			}
+		}
+
+		// Extract desired Dataflows from named parameters
+
+		options_param = input.named_parameters.find("dataflows");
+
+		if (options_param != input.named_parameters.end()) {
+			auto &items = options_param->second;
+
+			if (!items.IsNull() && items.type() == LogicalType::LIST(LogicalType::VARCHAR)) {
+				for (const auto &item : ListValue::GetChildren(items)) {
+					auto value = item.GetValue<string>();
+
+					// When "all" is provided, ignore other dataflow values
+					if (value == "all") {
+						dataflows.clear();
+						break;
+					}
+					dataflows.push_back(value);
+				}
+			}
+		}
+		if (dataflows.empty()) {
+			dataflows.push_back("all");
+		}
+
+		// Extract desired Language from named parameters
+
+		options_param = input.named_parameters.find("language");
+
+		if (options_param != input.named_parameters.end()) {
+			auto &item = options_param->second;
+
+			if (!item.IsNull() && item.type() == LogicalType::VARCHAR) {
+				language = item.GetValue<string>();
+			}
+		}
+		if (language.empty()) {
+			language = "en";
+		}
+
+		// Get the dataflow metadata collection (synchronously for now)
+
+		std::vector<DataflowInfo> rows;
+		HttpSettings settings;
+		idx_t req_count = 0;
+
+		for (const auto &provider_id : providers) {
+			const auto it = eurostat::ENDPOINTS.find(provider_id);
+
+			for (const auto &dataflow : dataflows) {
+				string url = it->second.api_url + "dataflow/" + provider_id + "/" + dataflow +
+				             "?format=JSON&compressed=true&lang=" + language;
+
+				if (req_count == 0) {
+					settings = HttpRequest::ExtractHttpSettings(context, url);
+				}
+				req_count++;
+
+				// Execute HTTP GET request
+
+				auto response =
+				    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
+
+				if (response.status_code != 200) {
+					throw IOException(
+					    "Failed to fetch EUROSTAT dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
+					    provider_id.c_str(), dataflow.c_str(), response.status_code, response.error.c_str());
+				}
+				if (!response.error.empty()) {
+					throw IOException(response.error);
+				}
+
+				// Parse JSON response
+
+				const auto json_data = yyjson_read(response.body.c_str(), response.body.size(), YYJSON_READ_NOFLAG);
+				if (!json_data) {
+					throw IOException("Failed to parse EUROSTAT dataflow metadata from provider='%s', dataflow='%s'.",
+					                  provider_id.c_str(), dataflow.c_str());
+				}
+
+				// printf("Fetched metadata from provider='%s', dataflow='%s'.\n", provider_id.c_str(),
+				// dataflow.c_str()); printf("Response body: %s.\n", response.body.c_str());
+
+				try {
+					auto root_val = yyjson_doc_get_root(json_data);
+
+					// Parse input metadata of dataflows
+
+					if (dataflow == "all") {
+						yyjson_val *link_val = nullptr;
+						yyjson_val *item_val = nullptr;
+
+						if (!yyjson_is_obj(link_val = yyjson_obj_get(root_val, "link"))) {
+							throw InvalidInputException(
+							    "Invalid EUROSTAT dataflow metadata: missing 'link' attribute.");
+						}
+						if (!yyjson_is_arr(item_val = yyjson_obj_get(link_val, "item"))) {
+							throw InvalidInputException(
+							    "Invalid EUROSTAT dataflow metadata: missing 'link/item' attribute.");
+						}
+
+						auto array_len = yyjson_arr_size(item_val);
+
+						for (size_t i = 0; i < array_len; i++) {
+							auto elem_val = yyjson_arr_get(item_val, i);
+							auto dataflow_info = ParseDataflowInfo(provider_id, elem_val);
+							rows.push_back(dataflow_info);
+						}
+					} else if (yyjson_is_obj(root_val)) {
+						auto dataflow_info = ParseDataflowInfo(provider_id, root_val);
+						rows.push_back(dataflow_info);
+					}
+
+					// Make sure to free the JSON document
+					yyjson_doc_free(json_data);
+
+				} catch (...) {
+					// Make sure to free the JSON document in case of an exception
+					yyjson_doc_free(json_data);
+					throw;
+				}
+			}
+		}
+
+		return make_uniq_base<FunctionData, BindData>(rows);
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Init
+	//------------------------------------------------------------------------------------------------------------------
+
+	struct State final : GlobalTableFunctionState {
+		idx_t current_row;
+		explicit State() : current_row(0) {
+		}
+	};
+
+	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
+		return make_uniq_base<GlobalTableFunctionState, State>();
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Cardinality
+	//------------------------------------------------------------------------------------------------------------------
+
+	static unique_ptr<NodeStatistics> Cardinality(ClientContext &context, const FunctionData *data) {
+
+		auto &bind_data = data->Cast<BindData>();
+		auto result = make_uniq<NodeStatistics>();
+
+		// This is the maximum number of points in a single file
+		result->has_max_cardinality = true;
+		result->max_cardinality = bind_data.rows.size();
+
+		return result;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Execute
+	//------------------------------------------------------------------------------------------------------------------
+
+	static void Execute(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
+
+		auto &bind_data = input.bind_data->Cast<BindData>();
+		auto &gstate = input.global_state->Cast<State>();
+
+		// Calculate how many record we can fit in the output
+		const auto output_size = std::min<idx_t>(STANDARD_VECTOR_SIZE, bind_data.rows.size() - gstate.current_row);
+		const auto current_row = gstate.current_row;
+
+		if (output_size == 0) {
+			output.SetCardinality(0);
+			return;
+		}
+
+		// Load current subset of rows.
+		for (idx_t row_idx = 0, record_idx = current_row; row_idx < output_size; row_idx++, record_idx++) {
+			const auto &dataflow_info = bind_data.rows[record_idx];
+
+			output.data[0].SetValue(row_idx, dataflow_info.provider_id);
+			output.data[1].SetValue(row_idx, dataflow_info.dataflow_id);
+			output.data[2].SetValue(row_idx, dataflow_info.type);
+			output.data[3].SetValue(row_idx, dataflow_info.version);
+			output.data[4].SetValue(row_idx, dataflow_info.label);
+			output.data[5].SetValue(row_idx, dataflow_info.language);
+
+			if (dataflow_info.number_of_values == -1) {
+				output.data[6].SetValue(row_idx, Value());
+			} else {
+				output.data[6].SetValue(row_idx, dataflow_info.number_of_values);
+			}
+
+			if (dataflow_info.data_start == -1) {
+				output.data[7].SetValue(row_idx, Value());
+			} else {
+				output.data[7].SetValue(row_idx, dataflow_info.data_start);
+			}
+
+			if (dataflow_info.data_end == -1) {
+				output.data[8].SetValue(row_idx, Value());
+			} else {
+				output.data[8].SetValue(row_idx, dataflow_info.data_end);
+			}
+
+			if (dataflow_info.update_data.empty()) {
+				output.data[9].SetValue(row_idx, Value());
+			} else {
+				timestamp_t value = Timestamp::FromString(dataflow_info.update_data, true);
+				output.data[9].SetValue(row_idx, Value::TIMESTAMPTZ(timestamp_tz_t(value)));
+			}
+
+			if (dataflow_info.update_structure.empty()) {
+				output.data[10].SetValue(row_idx, Value());
+			} else {
+				timestamp_t value = Timestamp::FromString(dataflow_info.update_structure, true);
+				output.data[10].SetValue(row_idx, Value::TIMESTAMPTZ(timestamp_tz_t(value)));
+			}
+
+			if (dataflow_info.data_structure.empty()) {
+				output.data[11].SetValue(row_idx, Value());
+			} else {
+				output.data[11].SetValue(row_idx, dataflow_info.data_structure);
+			}
+
+			if (dataflow_info.annotations.empty()) {
+				output.data[12].SetValue(row_idx, Value());
+			} else {
+				output.data[12].SetValue(row_idx, dataflow_info.annotations);
+			}
+		}
+
+		// Update the point index
+		gstate.current_row += output_size;
+
+		// Set the cardinality of the output
+		output.SetCardinality(output_size);
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Documentation
+	//------------------------------------------------------------------------------------------------------------------
+
+	static constexpr auto DESCRIPTION = R"(
+		Returns info of the dataflows provided by EUROSTAT Providers.
+	)";
+
+	static constexpr auto EXAMPLE = R"(
+		SELECT * FROM EUROSTAT_Dataflows();
+		SELECT * FROM EUROSTAT_Dataflows(providers = ['ESTAT','ECFIN'], language = 'en');
+
+		--- You can also filter by specific dataflows:
+
+		SELECT
+			provider_id,
+			dataflow_id,
+			class,
+			version,
+			label
+		FROM
+			EUROSTAT_Dataflows(providers = ['ESTAT'], dataflows = ['DEMO_R_D2JAN'], language = 'de')
+		;
+
+		┌─────────────┬──────────────┬─────────┬─────────┬───────────────────────────────────────────────────────────────────┐
+		│ provider_id │  dataflow_id │  class  │ version │                               label                               │
+		│   varchar   │   varchar    │ varchar │ varchar │                              varchar                              │
+		├─────────────┼──────────────┼─────────┼─────────┼───────────────────────────────────────────────────────────────────┤
+		│ ESTAT       │ DEMO_R_D2JAN │ dataset │ 1.0     │ Bevölkerung am 1. Januar nach Alter, Geschlecht und NUTS-2-Region │
+		└─────────────┴──────────────┴─────────┴─────────┴───────────────────────────────────────────────────────────────────┘
+	)";
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Register
+	//------------------------------------------------------------------------------------------------------------------
+
+	static void Register(ExtensionLoader &loader) {
+
+		InsertionOrderPreservingMap<string> tags;
+		tags.insert("ext", "eurostat");
+		tags.insert("category", "table");
+
+		TableFunction func("EUROSTAT_Dataflows", {}, Execute, Bind, Init);
+
+		func.cardinality = Cardinality;
+		func.named_parameters["providers"] = LogicalType::LIST(LogicalType::VARCHAR);
+		func.named_parameters["dataflows"] = LogicalType::LIST(LogicalType::VARCHAR);
+		func.named_parameters["language"] = LogicalType::VARCHAR;
+
+		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+	}
+};
+
 } // namespace
 
 // #####################################################################################################################
@@ -135,6 +634,7 @@ struct ES_Endpoints {
 void EurostatInfoFunctions::Register(ExtensionLoader &loader) {
 
 	ES_Endpoints::Register(loader);
+	ES_Dataflows::Register(loader);
 }
 
 } // namespace duckdb
