@@ -83,6 +83,34 @@ This is the list of available functions:
 	└─────────────┴──────────────┴─────────┴─────────┴───────────────────────────────────────────────────────────────────┘
     ```
 
++ ### EUROSTAT_DataStructure()
+
+    Returns information of the data structure of an EUROSTAT Dataflow.
+
+    ```sql
+	SELECT
+		provider_id,
+		dataflow_id,
+		position,
+		dimension,
+		concept
+	FROM
+		EUROSTAT_DataStructure('ESTAT', 'DEMO_R_D2JAN', language := 'en')
+	;
+
+	┌─────────────┬──────────────┬──────────┬─────────────┬─────────────────────────────────┐
+	│ provider_id │ dataflow_id  │ position │  dimension  │             concept             │
+	│   varchar   │   varchar    │  int32   │   varchar   │             varchar             │
+	├─────────────┼──────────────┼──────────┼─────────────┼─────────────────────────────────┤
+	│ ESTAT       │ DEMO_R_D2JAN │        1 │ freq        │ Time frequency                  │
+	│ ESTAT       │ DEMO_R_D2JAN │        2 │ unit        │ Unit of measure                 │
+	│ ESTAT       │ DEMO_R_D2JAN │        3 │ sex         │ Sex                             │
+	│ ESTAT       │ DEMO_R_D2JAN │        4 │ age         │ Age class                       │
+	│ ESTAT       │ DEMO_R_D2JAN │        5 │ geo         │ Geopolitical entity (reporting) │
+	│ ESTAT       │ DEMO_R_D2JAN │        6 │ time_period │ Time                            │
+	└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
+    ```
+
 ### Supported Functions and Documentation
 
 The full list of functions and their documentation is available in the [function reference](docs/functions.md)

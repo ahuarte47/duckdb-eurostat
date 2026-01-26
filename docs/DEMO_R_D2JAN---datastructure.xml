@@ -1,0 +1,178 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<m:Structure xmlns:m="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message"
+    xmlns:s="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure"
+    xmlns:c="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">
+    <m:Header>
+        <m:ID>DS-DEMO_R_D2JAN1768897729248</m:ID>
+        <m:Test>false</m:Test>
+        <m:Prepared>2026-01-20T08:28:49.248Z</m:Prepared>
+        <m:Sender id="ESTAT">
+            <c:Name xml:lang="de">Statistische Amt der Europäischen Union (Eurostat)</c:Name>
+            <c:Name xml:lang="en">Statistical Office of the European Union (Eurostat)</c:Name>
+            <c:Name xml:lang="fr">Office de statistique de l'Union européenne (Eurostat)</c:Name>
+        </m:Sender>
+        <m:Receiver id="unknown" />
+    </m:Header>
+    <m:Structures>
+        <s:DataStructures>
+            <s:DataStructure agencyID="ESTAT" id="DEMO_R_D2JAN" isFinal="true"
+                urn="urn:sdmx:org.sdmx.infomodel.datastructure.DataStructure=ESTAT:DEMO_R_D2JAN(53.0)"
+                version="53.0">
+                <c:Annotations>
+                    <c:Annotation>
+                        <c:AnnotationTitle>OBS_FLAG</c:AnnotationTitle>
+                        <c:AnnotationType>DISSEMINATION_FLAG_SETTINGS</c:AnnotationType>
+                        <c:AnnotationURL />
+                    </c:Annotation>
+                    <c:Annotation>
+                        <c:AnnotationTitle>time</c:AnnotationTitle>
+                        <c:AnnotationType>DISSEMINATION_TIME_DIMENSION_CODE</c:AnnotationType>
+                        <c:AnnotationURL />
+                    </c:Annotation>
+                </c:Annotations>
+                <c:Name xml:lang="en">DEMO_R_D2JAN data structure</c:Name>
+                <s:DataStructureComponents>
+                    <s:DimensionList id="DimensionDescriptor"
+                        urn="urn:sdmx:org.sdmx.infomodel.datastructure.DimensionDescriptor=ESTAT:DEMO_R_D2JAN(53.0).DimensionDescriptor">
+                        <s:Dimension id="freq" position="1"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=ESTAT:DEMO_R_D2JAN(53.0).freq">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="freq"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:Enumeration>
+                                    <Ref agencyID="ESTAT" class="Codelist" id="FREQ"
+                                        package="codelist" version="3.9" />
+                                </s:Enumeration>
+                            </s:LocalRepresentation>
+                        </s:Dimension>
+                        <s:Dimension id="unit" position="2"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=ESTAT:DEMO_R_D2JAN(53.0).unit">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="unit"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:Enumeration>
+                                    <Ref agencyID="ESTAT" class="Codelist" id="UNIT"
+                                        package="codelist" version="69.1" />
+                                </s:Enumeration>
+                            </s:LocalRepresentation>
+                        </s:Dimension>
+                        <s:Dimension id="sex" position="3"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=ESTAT:DEMO_R_D2JAN(53.0).sex">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="sex"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:Enumeration>
+                                    <Ref agencyID="ESTAT" class="Codelist" id="SEX"
+                                        package="codelist" version="1.13" />
+                                </s:Enumeration>
+                            </s:LocalRepresentation>
+                        </s:Dimension>
+                        <s:Dimension id="age" position="4"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=ESTAT:DEMO_R_D2JAN(53.0).age">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="age"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:Enumeration>
+                                    <Ref agencyID="ESTAT" class="Codelist" id="AGE"
+                                        package="codelist" version="15.0" />
+                                </s:Enumeration>
+                            </s:LocalRepresentation>
+                        </s:Dimension>
+                        <s:Dimension id="geo" position="5"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=ESTAT:DEMO_R_D2JAN(53.0).geo">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="geo"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:Enumeration>
+                                    <Ref agencyID="ESTAT" class="Codelist" id="GEO"
+                                        package="codelist" version="26.0" />
+                                </s:Enumeration>
+                            </s:LocalRepresentation>
+                        </s:Dimension>
+                        <s:TimeDimension id="TIME_PERIOD" position="6"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.TimeDimension=ESTAT:DEMO_R_D2JAN(53.0).TIME_PERIOD">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="TIME_PERIOD"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:TextFormat textType="ObservationalTimePeriod" />
+                            </s:LocalRepresentation>
+                        </s:TimeDimension>
+                    </s:DimensionList>
+                    <s:AttributeList id="AttributeDescriptor"
+                        urn="urn:sdmx:org.sdmx.infomodel.datastructure.AttributeDescriptor=ESTAT:DEMO_R_D2JAN(53.0).AttributeDescriptor">
+                        <s:Attribute assignmentStatus="Conditional" id="OBS_FLAG"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.DataAttribute=ESTAT:DEMO_R_D2JAN(53.0).OBS_FLAG">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="OBS_FLAG"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:Enumeration>
+                                    <Ref agencyID="ESTAT" class="Codelist" id="OBS_FLAG"
+                                        package="codelist" version="1.39" />
+                                </s:Enumeration>
+                            </s:LocalRepresentation>
+                            <s:AttributeRelationship>
+                                <s:PrimaryMeasure>
+                                    <Ref id="OBS_VALUE" />
+                                </s:PrimaryMeasure>
+                            </s:AttributeRelationship>
+                        </s:Attribute>
+                        <s:Attribute assignmentStatus="Conditional" id="CONF_STATUS"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.DataAttribute=ESTAT:DEMO_R_D2JAN(53.0).CONF_STATUS">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="CONF_STATUS"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:Enumeration>
+                                    <Ref agencyID="ESTAT" class="Codelist" id="CONF_STATUS"
+                                        package="codelist" version="1.2" />
+                                </s:Enumeration>
+                            </s:LocalRepresentation>
+                            <s:AttributeRelationship>
+                                <s:PrimaryMeasure>
+                                    <Ref id="OBS_VALUE" />
+                                </s:PrimaryMeasure>
+                            </s:AttributeRelationship>
+                        </s:Attribute>
+                    </s:AttributeList>
+                    <s:MeasureList id="MeasureDescriptor"
+                        urn="urn:sdmx:org.sdmx.infomodel.datastructure.MeasureDescriptor=ESTAT:DEMO_R_D2JAN(53.0).MeasureDescriptor">
+                        <s:PrimaryMeasure id="OBS_VALUE"
+                            urn="urn:sdmx:org.sdmx.infomodel.datastructure.PrimaryMeasure=ESTAT:DEMO_R_D2JAN(53.0).OBS_VALUE">
+                            <s:ConceptIdentity>
+                                <Ref agencyID="ESTAT" class="Concept" id="OBS_VALUE"
+                                    maintainableParentID="DEMO_R_D2JAN"
+                                    maintainableParentVersion="49.0" package="conceptscheme" />
+                            </s:ConceptIdentity>
+                            <s:LocalRepresentation>
+                                <s:TextFormat textType="Double" />
+                            </s:LocalRepresentation>
+                        </s:PrimaryMeasure>
+                    </s:MeasureList>
+                </s:DataStructureComponents>
+            </s:DataStructure>
+        </s:DataStructures>
+    </m:Structures>
+</m:Structure>

@@ -1,0 +1,25 @@
+# name: test/sql/eurostat_datastructure.test
+# description: test eurostat extension
+# group: [sql]
+
+require eurostat
+
+query IIIII
+SELECT
+    provider_id,
+    dataflow_id,
+    position,
+    dimension,
+    concept
+FROM
+    EUROSTAT_DataStructure('ESTAT', 'DEMO_R_D2JAN', language := 'en')
+ORDER BY
+    position
+;
+----
+ESTAT	DEMO_R_D2JAN	1	freq	Time frequency
+ESTAT	DEMO_R_D2JAN	2	unit	Unit of measure
+ESTAT	DEMO_R_D2JAN	3	sex	Sex
+ESTAT	DEMO_R_D2JAN	4	age	Age class
+ESTAT	DEMO_R_D2JAN	5	geo	Geopolitical entity (reporting)
+ESTAT	DEMO_R_D2JAN	6	time_period	Time

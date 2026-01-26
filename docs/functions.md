@@ -7,6 +7,7 @@
 | --- | --- |
 | [`EUROSTAT_Dataflows`](#eurostat_dataflows) | Returns info of the dataflows provided by EUROSTAT Providers. |
 | [`EUROSTAT_Endpoints`](#eurostat_endpoints) | Returns the list of supported EUROSTAT API Endpoints. |
+| [`EUROSTAT_DataStructure`](#eurostat_datastructure) | Returns information of the data structure of an EUROSTAT Dataflow. |
 
 ----
 
@@ -86,6 +87,50 @@ EUROSTAT_Endpoints ()
 		│ GROW        │ DG GROW      │ Internal Market, Industry, Entrepreneurship and SMEs │
 		│ TAXUD       │ DG TAXUD     │ Taxation and Customs Union                           │
 		└─────────────┴──────────────┴──────────────────────────────────────────────────────┘
+
+```
+
+----
+
+### EUROSTAT_DataStructure
+
+#### Signature
+
+```sql
+EUROSTAT_DataStructure ()
+```
+
+#### Description
+
+
+		Returns information of the data structure of an EUROSTAT Dataflow.
+
+
+#### Example
+
+```sql
+
+		SELECT
+			provider_id,
+			dataflow_id,
+			position,
+			dimension,
+			concept
+		FROM
+			EUROSTAT_DataStructure('ESTAT', 'DEMO_R_D2JAN', language := 'en')
+		;
+
+		┌─────────────┬──────────────┬──────────┬─────────────┬─────────────────────────────────┐
+		│ provider_id │ dataflow_id  │ position │  dimension  │             concept             │
+		│   varchar   │   varchar    │  int32   │   varchar   │             varchar             │
+		├─────────────┼──────────────┼──────────┼─────────────┼─────────────────────────────────┤
+		│ ESTAT       │ DEMO_R_D2JAN │        1 │ freq        │ Time frequency                  │
+		│ ESTAT       │ DEMO_R_D2JAN │        2 │ unit        │ Unit of measure                 │
+		│ ESTAT       │ DEMO_R_D2JAN │        3 │ sex         │ Sex                             │
+		│ ESTAT       │ DEMO_R_D2JAN │        4 │ age         │ Age class                       │
+		│ ESTAT       │ DEMO_R_D2JAN │        5 │ geo         │ Geopolitical entity (reporting) │
+		│ ESTAT       │ DEMO_R_D2JAN │        6 │ time_period │ Time                            │
+		└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
 
 ```
 

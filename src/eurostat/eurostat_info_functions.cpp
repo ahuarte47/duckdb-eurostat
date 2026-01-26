@@ -10,9 +10,14 @@
 #include "yyjson.hpp"
 using namespace duckdb_yyjson; // NOLINT
 
+// LibXml2
+#include "libxml/parser.h"
+#include "libxml/xpath.h"
+
 // EUROSTAT
 #include "eurostat.hpp"
 #include "http_request.hpp"
+#include "xml_element.hpp"
 
 namespace duckdb {
 
@@ -142,8 +147,8 @@ struct ES_Dataflows {
 		string language;
 
 		int64_t number_of_values = -1;
-		int32_t data_start = -1;
-		int32_t data_end = -1;
+		string data_start;
+		string data_end;
 		string update_data;
 		string update_structure;
 
@@ -234,14 +239,14 @@ struct ES_Dataflows {
 
 				if (yyjson_is_str(key_val)) {
 					auto val = yyjson_get_str(key_val);
-					info.data_start = val ? std::stoi(val) : -1;
+					info.data_start = val ? string(val) : "";
 				}
 			} else if (StringUtil::Equals(key, "OBS_PERIOD_OVERALL_LATEST")) {
 				auto key_val = yyjson_obj_get(elem_val, "title");
 
 				if (yyjson_is_str(key_val)) {
 					auto val = yyjson_get_str(key_val);
-					info.data_end = val ? std::stoi(val) : -1;
+					info.data_end = val ? string(val) : "";
 				}
 			} else if (StringUtil::Equals(key, "UPDATE_DATA")) {
 				auto key_val = yyjson_obj_get(elem_val, "date");
@@ -296,9 +301,9 @@ struct ES_Dataflows {
 		names.emplace_back("number_of_values");
 		return_types.push_back(LogicalType::BIGINT);
 		names.emplace_back("data_start");
-		return_types.push_back(LogicalType::INTEGER);
+		return_types.push_back(LogicalType::VARCHAR);
 		names.emplace_back("data_end");
-		return_types.push_back(LogicalType::INTEGER);
+		return_types.push_back(LogicalType::VARCHAR);
 
 		names.emplace_back("update_data");
 		return_types.push_back(LogicalType::TIMESTAMP_TZ);
@@ -323,7 +328,7 @@ struct ES_Dataflows {
 
 					// Validate Endpoint name
 					if (eurostat::ENDPOINTS.find(value) == eurostat::ENDPOINTS.end()) {
-						throw InvalidInputException("Unknown EUROSTAT Endpoint '%s'.", value);
+						throw InvalidInputException("Unknown EUROSTAT Endpoint '%s'.", value.c_str());
 					}
 					providers.push_back(value);
 				}
@@ -383,8 +388,8 @@ struct ES_Dataflows {
 		for (const auto &provider_id : providers) {
 			const auto it = eurostat::ENDPOINTS.find(provider_id);
 
-			for (const auto &dataflow : dataflows) {
-				string url = it->second.api_url + "dataflow/" + provider_id + "/" + dataflow +
+			for (const auto &dataflow_id : dataflows) {
+				string url = it->second.api_url + "dataflow/" + provider_id + "/" + dataflow_id +
 				             "?format=JSON&compressed=true&lang=" + language;
 
 				if (req_count == 0) {
@@ -400,7 +405,7 @@ struct ES_Dataflows {
 				if (response.status_code != 200) {
 					throw IOException(
 					    "Failed to fetch EUROSTAT dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
-					    provider_id.c_str(), dataflow.c_str(), response.status_code, response.error.c_str());
+					    provider_id.c_str(), dataflow_id.c_str(), response.status_code, response.error.c_str());
 				}
 				if (!response.error.empty()) {
 					throw IOException(response.error);
@@ -411,18 +416,15 @@ struct ES_Dataflows {
 				const auto json_data = yyjson_read(response.body.c_str(), response.body.size(), YYJSON_READ_NOFLAG);
 				if (!json_data) {
 					throw IOException("Failed to parse EUROSTAT dataflow metadata from provider='%s', dataflow='%s'.",
-					                  provider_id.c_str(), dataflow.c_str());
+					                  provider_id.c_str(), dataflow_id.c_str());
 				}
-
-				// printf("Fetched metadata from provider='%s', dataflow='%s'.\n", provider_id.c_str(),
-				// dataflow.c_str()); printf("Response body: %s.\n", response.body.c_str());
 
 				try {
 					auto root_val = yyjson_doc_get_root(json_data);
 
 					// Parse input metadata of dataflows
 
-					if (dataflow == "all") {
+					if (dataflow_id == "all") {
 						yyjson_val *link_val = nullptr;
 						yyjson_val *item_val = nullptr;
 
@@ -526,13 +528,13 @@ struct ES_Dataflows {
 				output.data[6].SetValue(row_idx, dataflow_info.number_of_values);
 			}
 
-			if (dataflow_info.data_start == -1) {
+			if (dataflow_info.data_start.empty()) {
 				output.data[7].SetValue(row_idx, Value());
 			} else {
 				output.data[7].SetValue(row_idx, dataflow_info.data_start);
 			}
 
-			if (dataflow_info.data_end == -1) {
+			if (dataflow_info.data_end.empty()) {
 				output.data[8].SetValue(row_idx, Value());
 			} else {
 				output.data[8].SetValue(row_idx, dataflow_info.data_end);
@@ -625,6 +627,410 @@ struct ES_Dataflows {
 	}
 };
 
+//======================================================================================================================
+// ES_DataStructure
+//======================================================================================================================
+
+static constexpr const char *ES_XMLSNS_M = "{http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message}";
+static constexpr const char *ES_XMLSNS_S = "{http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure}";
+
+static constexpr const char *ES_DIMENSION_PATH =
+    "/m:Structure/m:Structures/s:DataStructures/s:DataStructure/s:DataStructureComponents/s:DimensionList/s:Dimension";
+static constexpr const char *ES_TIME_DIMENSION_PATH = "/m:Structure/m:Structures/s:DataStructures/s:DataStructure/"
+                                                      "s:DataStructureComponents/s:DimensionList/s:TimeDimension";
+static constexpr const char *ES_CONCEPT_PATH = "/m:Structure/m:Structures/s:Concepts/s:ConceptScheme/s:Concept";
+static constexpr const char *ES_VALUES_PATH =
+    "/m:Structure/m:Structures/s:Constraints/s:ContentConstraint/s:CubeRegion/c:KeyValue";
+
+struct ES_DataStructure {
+
+	//! Information of a Dimension of an EUROSTAT Dataflow
+	struct Dimension {
+		int32_t position = -1;
+		string id;
+		string concept_id;
+		string concept_label;
+		string values;
+	};
+
+	//! Returns the basic data structure of an EUROSTAT Dataflow.
+	static std::vector<Dimension> GetBasicDataSchema(ClientContext &context, const string &provider_id,
+	                                                 const string &dataflow_id, const string &language) {
+
+		std::vector<Dimension> dimensions;
+
+		// Execute HTTP GET request
+
+		const auto it = eurostat::ENDPOINTS.find(provider_id);
+		string url = it->second.api_url + "dataflow/" + provider_id + "/" + dataflow_id +
+		             "/latest?detail=referencepartial&references=descendants";
+
+		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
+		auto response =
+		    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
+
+		if (response.status_code != 200) {
+			throw IOException("Failed to fetch EUROSTAT dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
+			                  provider_id.c_str(), dataflow_id.c_str(), response.status_code, response.error.c_str());
+		}
+		if (!response.error.empty()) {
+			throw IOException(response.error);
+		}
+
+		// Get the dimensions from XML response
+
+		XmlDocument document = XmlDocument(response.body);
+		xmlDocPtr doc_obj = document.GetDoc();
+		xmlXPathContextPtr xpath_ctx = document.GetXPathContext();
+		xmlXPathObjectPtr xpath_obj = nullptr;
+
+		for (const auto &xpath : {ES_DIMENSION_PATH, ES_TIME_DIMENSION_PATH}) {
+
+			if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST xpath, xpath_ctx)) && xpath_obj->nodesetval) {
+
+				for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
+					xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
+
+					auto dim_id = XmlUtils::GetNodeAttributeValue(node, "id");
+					if (!dim_id.empty()) {
+						Dimension dim;
+						dim.id = dim_id;
+						dim.position = std::atoi(XmlUtils::GetNodeAttributeValue(node, "position").c_str());
+
+						// Get the Concept ID for the Dimension
+						xmlXPathContextPtr local_ctx = xmlXPathNewContext(doc_obj);
+						if (local_ctx) {
+							document.RegisterNamespaces(local_ctx);
+							local_ctx->node = node;
+
+							xmlXPathObjectPtr temp_obj = nullptr;
+							if ((temp_obj = xmlXPathEvalExpression(BAD_CAST "./s:ConceptIdentity/Ref", local_ctx)) &&
+							    temp_obj->nodesetval && temp_obj->nodesetval->nodeNr > 0) {
+								xmlNodePtr ref_node = temp_obj->nodesetval->nodeTab[0];
+								dim.concept_id = XmlUtils::GetNodeAttributeValue(ref_node, "id");
+							}
+							if (temp_obj) {
+								xmlXPathFreeObject(temp_obj);
+							}
+							xmlXPathFreeContext(local_ctx);
+						}
+						dimensions.emplace_back(dim);
+					}
+				}
+			}
+			if (xpath_obj) {
+				xmlXPathFreeObject(xpath_obj);
+				xpath_obj = nullptr;
+			}
+		}
+
+		// Get the Concept names for Dimensions
+
+		if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_CONCEPT_PATH, xpath_ctx)) && xpath_obj->nodesetval) {
+
+			for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
+				xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
+
+				auto concept_id = XmlUtils::GetNodeAttributeValue(node, "id");
+				if (!concept_id.empty()) {
+					for (auto &dim : dimensions) {
+						if (dim.concept_id == concept_id) {
+
+							for (xmlNodePtr child = node->children; child; child = child->next) {
+
+								if (strcmp((const char *)child->name, "Name") == 0) {
+									string lang = XmlUtils::GetNodeAttributeValue(child, "lang", language);
+
+									if (lang == language || dim.concept_label.empty()) {
+										dim.concept_label = XmlUtils::GetNodeTextContent(child);
+									}
+								}
+							}
+							break;
+						}
+					}
+				}
+			}
+		}
+		if (xpath_obj) {
+			xmlXPathFreeObject(xpath_obj);
+			xpath_obj = nullptr;
+		}
+
+		return dimensions;
+	}
+
+	//! Returns the data structure of an EUROSTAT Dataflow.
+	static std::vector<Dimension> GetDataSchema(ClientContext &context, const string &provider_id,
+	                                            const string &dataflow_id, const string &language) {
+
+		auto dimensions = ES_DataStructure::GetBasicDataSchema(context, provider_id, dataflow_id, language);
+
+		// Execute HTTP GET request
+
+		const auto it = eurostat::ENDPOINTS.find(provider_id);
+		string url = it->second.api_url + "contentconstraint/" + provider_id + "/" + dataflow_id;
+
+		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
+		auto response =
+		    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
+
+		if (response.status_code != 200) {
+			throw IOException("Failed to fetch EUROSTAT dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
+			                  provider_id.c_str(), dataflow_id.c_str(), response.status_code, response.error.c_str());
+		}
+		if (!response.error.empty()) {
+			throw IOException(response.error);
+		}
+
+		// Get the different values of dimensions from XML response
+
+		XmlDocument document = XmlDocument(response.body);
+		xmlXPathContextPtr xpath_ctx = document.GetXPathContext();
+		xmlXPathObjectPtr xpath_obj = nullptr;
+
+		if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_VALUES_PATH, xpath_ctx)) && xpath_obj->nodesetval) {
+
+			for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
+				xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
+
+				auto dim_id = XmlUtils::GetNodeAttributeValue(node, "id");
+				if (!dim_id.empty()) {
+					for (auto &dim : dimensions) {
+						if (dim.id == dim_id) {
+
+							std::ostringstream code_values;
+							code_values << "[";
+
+							for (xmlNodePtr child = node->children; child; child = child->next) {
+								if (strcmp((const char *)child->name, "Value") == 0) {
+									string code_value = XmlUtils::GetNodeTextContent(child);
+									code_values << '"' << code_value << "\",";
+								}
+							}
+							if (code_values.tellp() > 1) {
+								code_values.seekp(-1, std::ios_base::end); // Remove last comma
+								code_values << "]";
+								dim.values = code_values.str();
+							} else {
+								dim.values = "[]";
+							}
+							break;
+						}
+					}
+				}
+			}
+		}
+		if (xpath_obj) {
+			xmlXPathFreeObject(xpath_obj);
+			xpath_obj = nullptr;
+		}
+
+		return dimensions;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Bind
+	//------------------------------------------------------------------------------------------------------------------
+
+	struct BindData final : TableFunctionData {
+		string provider_id;
+		string dataflow_id;
+		std::vector<Dimension> rows;
+
+		explicit BindData(const string &provider_id, const string &dataflow_id, const std::vector<Dimension> &rows)
+		    : provider_id(provider_id), dataflow_id(dataflow_id), rows(std::move(rows)) {
+		}
+	};
+
+	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
+	                                     vector<LogicalType> &return_types, vector<string> &names) {
+
+		D_ASSERT(input.inputs.size() == 2);
+
+		const string provider_id = StringValue::Get(input.inputs[0]);
+		const string dataflow_id = StringValue::Get(input.inputs[1]);
+		string language = "en";
+
+		// Validate input parameters
+
+		if (provider_id.empty()) {
+			throw InvalidInputException(
+			    "EUROSTAT_DataStructure: first parameter, the 'provider' identifier, cannot be empty.");
+		}
+
+		if (dataflow_id.empty()) {
+			throw InvalidInputException(
+			    "EUROSTAT_DataStructure: second parameter, the 'dataflow' code, cannot be empty.");
+		}
+
+		if (eurostat::ENDPOINTS.find(provider_id) == eurostat::ENDPOINTS.end()) {
+			throw InvalidInputException("Unknown EUROSTAT Endpoint '%s'.", provider_id.c_str());
+		}
+
+		// Extract desired Language from named parameters
+
+		auto options_param = input.named_parameters.find("language");
+
+		if (options_param != input.named_parameters.end()) {
+			auto &item = options_param->second;
+
+			if (!item.IsNull() && item.type() == LogicalType::VARCHAR) {
+				language = item.GetValue<string>();
+			}
+		}
+		if (language.empty()) {
+			language = "en";
+		}
+
+		// Get list of Dimensions of a Dataflow
+
+		std::vector<Dimension> rows = ES_DataStructure::GetDataSchema(context, provider_id, dataflow_id, language);
+
+		names.emplace_back("provider_id");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("dataflow_id");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("position");
+		return_types.push_back(LogicalType::INTEGER);
+		names.emplace_back("dimension");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("concept");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("values");
+		return_types.push_back(LogicalType::JSON());
+
+		return make_uniq_base<FunctionData, BindData>(provider_id, dataflow_id, rows);
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Init
+	//------------------------------------------------------------------------------------------------------------------
+
+	struct State final : GlobalTableFunctionState {
+		idx_t current_row;
+		explicit State() : current_row(0) {
+		}
+	};
+
+	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
+		return make_uniq_base<GlobalTableFunctionState, State>();
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Cardinality
+	//------------------------------------------------------------------------------------------------------------------
+
+	static unique_ptr<NodeStatistics> Cardinality(ClientContext &context, const FunctionData *data) {
+
+		auto &bind_data = data->Cast<BindData>();
+		auto result = make_uniq<NodeStatistics>();
+
+		// This is the maximum number of points in a single file
+		result->has_max_cardinality = true;
+		result->max_cardinality = bind_data.rows.size();
+
+		return result;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Execute
+	//------------------------------------------------------------------------------------------------------------------
+
+	static void Execute(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
+
+		auto &bind_data = input.bind_data->Cast<BindData>();
+		auto &gstate = input.global_state->Cast<State>();
+
+		// Calculate how many record we can fit in the output
+		const auto output_size = std::min<idx_t>(STANDARD_VECTOR_SIZE, bind_data.rows.size() - gstate.current_row);
+		const auto current_row = gstate.current_row;
+
+		if (output_size == 0) {
+			output.SetCardinality(0);
+			return;
+		}
+
+		// Load current subset of rows.
+		for (idx_t row_idx = 0, record_idx = current_row; row_idx < output_size; row_idx++, record_idx++) {
+			const auto &dimension = bind_data.rows[record_idx];
+
+			output.data[0].SetValue(row_idx, bind_data.provider_id);
+			output.data[1].SetValue(row_idx, bind_data.dataflow_id);
+			output.data[2].SetValue(row_idx, dimension.position);
+			output.data[3].SetValue(row_idx, StringUtil::Lower(dimension.id));
+
+			if (dimension.concept_label.empty()) {
+				output.data[4].SetValue(row_idx, Value());
+			} else {
+				output.data[4].SetValue(row_idx, dimension.concept_label);
+			}
+
+			if (dimension.values.empty()) {
+				output.data[5].SetValue(row_idx, Value());
+			} else {
+				output.data[5].SetValue(row_idx, dimension.values);
+			}
+		}
+
+		// Update the point index
+		gstate.current_row += output_size;
+
+		// Set the cardinality of the output
+		output.SetCardinality(output_size);
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Documentation
+	//------------------------------------------------------------------------------------------------------------------
+
+	static constexpr auto DESCRIPTION = R"(
+		Returns information of the data structure of an EUROSTAT Dataflow.
+	)";
+
+	static constexpr auto EXAMPLE = R"(
+		SELECT
+			provider_id,
+			dataflow_id,
+			position,
+			dimension,
+			concept
+		FROM
+			EUROSTAT_DataStructure('ESTAT', 'DEMO_R_D2JAN', language := 'en')
+		;
+
+		┌─────────────┬──────────────┬──────────┬─────────────┬─────────────────────────────────┐
+		│ provider_id │ dataflow_id  │ position │  dimension  │             concept             │
+		│   varchar   │   varchar    │  int32   │   varchar   │             varchar             │
+		├─────────────┼──────────────┼──────────┼─────────────┼─────────────────────────────────┤
+		│ ESTAT       │ DEMO_R_D2JAN │        1 │ freq        │ Time frequency                  │
+		│ ESTAT       │ DEMO_R_D2JAN │        2 │ unit        │ Unit of measure                 │
+		│ ESTAT       │ DEMO_R_D2JAN │        3 │ sex         │ Sex                             │
+		│ ESTAT       │ DEMO_R_D2JAN │        4 │ age         │ Age class                       │
+		│ ESTAT       │ DEMO_R_D2JAN │        5 │ geo         │ Geopolitical entity (reporting) │
+		│ ESTAT       │ DEMO_R_D2JAN │        6 │ time_period │ Time                            │
+		└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
+	)";
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Register
+	//------------------------------------------------------------------------------------------------------------------
+
+	static void Register(ExtensionLoader &loader) {
+
+		InsertionOrderPreservingMap<string> tags;
+		tags.insert("ext", "eurostat");
+		tags.insert("category", "table");
+
+		TableFunction func("EUROSTAT_DataStructure", {LogicalType::VARCHAR, LogicalType::VARCHAR}, Execute, Bind, Init);
+
+		func.cardinality = Cardinality;
+		func.named_parameters["language"] = LogicalType::VARCHAR;
+
+		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+	};
+};
+
 } // namespace
 
 // #####################################################################################################################
@@ -635,6 +1041,7 @@ void EurostatInfoFunctions::Register(ExtensionLoader &loader) {
 
 	ES_Endpoints::Register(loader);
 	ES_Dataflows::Register(loader);
+	ES_DataStructure::Register(loader);
 }
 
 } // namespace duckdb
