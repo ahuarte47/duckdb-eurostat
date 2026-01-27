@@ -584,7 +584,7 @@ struct ES_Dataflows {
 
 	static constexpr auto EXAMPLE = R"(
 		SELECT * FROM EUROSTAT_Dataflows();
-		SELECT * FROM EUROSTAT_Dataflows(providers = ['ESTAT','ECFIN'], language = 'en');
+		SELECT * FROM EUROSTAT_Dataflows(providers = ['ESTAT','ECFIN'], language := 'en');
 
 		--- You can also filter by specific dataflows:
 
@@ -595,7 +595,7 @@ struct ES_Dataflows {
 			version,
 			label
 		FROM
-			EUROSTAT_Dataflows(providers = ['ESTAT'], dataflows = ['DEMO_R_D2JAN'], language = 'de')
+			EUROSTAT_Dataflows(providers = ['ESTAT'], dataflows = ['DEMO_R_D2JAN'], language := 'de')
 		;
 
 		┌─────────────┬──────────────┬─────────┬─────────┬───────────────────────────────────────────────────────────────────┐

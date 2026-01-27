@@ -1,0 +1,20 @@
+# name: test/sql/eurostat_read.test
+# description: test eurostat extension
+# group: [sql]
+
+require eurostat
+
+query IIIIIII
+SELECT
+    *
+FROM
+    EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN')
+LIMIT
+    5
+;
+----
+A	NR	F	TOTAL	AL	2000	1526762.0
+A	NR	F	TOTAL	AL	2001	1535822.0
+A	NR	F	TOTAL	AL	2002	1532563.0
+A	NR	F	TOTAL	AL	2003	1526180.0
+A	NR	F	TOTAL	AL	2004	1520481.0

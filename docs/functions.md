@@ -32,7 +32,7 @@ EUROSTAT_Dataflows (providers VARCHAR[], dataflows VARCHAR[], language VARCHAR)
 ```sql
 
 		SELECT * FROM EUROSTAT_Dataflows();
-		SELECT * FROM EUROSTAT_Dataflows(providers = ['ESTAT','ECFIN'], language = 'en');
+		SELECT * FROM EUROSTAT_Dataflows(providers = ['ESTAT','ECFIN'], language := 'en');
 
 		--- You can also filter by specific datasets:
 
@@ -43,7 +43,7 @@ EUROSTAT_Dataflows (providers VARCHAR[], dataflows VARCHAR[], language VARCHAR)
 			version,
 			label
 		FROM
-			EUROSTAT_Dataflows(providers = ['ESTAT'], dataflows = ['DEMO_R_D2JAN'], language = 'de')
+			EUROSTAT_Dataflows(providers = ['ESTAT'], dataflows = ['DEMO_R_D2JAN'], language := 'de')
 		;
 
 		┌─────────────┬──────────────┬─────────┬─────────┬───────────────────────────────────────────────────────────────────┐
@@ -131,6 +131,41 @@ EUROSTAT_DataStructure ()
 		│ ESTAT       │ DEMO_R_D2JAN │        5 │ geo         │ Geopolitical entity (reporting) │
 		│ ESTAT       │ DEMO_R_D2JAN │        6 │ time_period │ Time                            │
 		└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
+
+```
+
+----
+
+### EUROSTAT_Read
+
+#### Signature
+
+```sql
+EUROSTAT_Read ()
+```
+
+#### Description
+
+
+		Returns the dataset of an EUROSTAT Dataflow.
+
+
+#### Example
+
+```sql
+
+		SELECT * FROM EUROSTAT_Read('ESTAT', 'demo_r_d2jan') LIMIT 10;
+
+		┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────────┬───────────────────┐
+		│  freq   │  unit   │   sex   │   age   │   geo   │ time_period │ observation_value │
+		│ varchar │ varchar │ varchar │ varchar │ varchar │   varchar   │      double       │
+		├─────────┼─────────┼─────────┼─────────┼─────────┼─────────────┼───────────────────┤
+		│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2000        │         1526762.0 │
+		│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2001        │         1535822.0 │
+		│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2002        │         1532563.0 │
+		│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2003        │         1526180.0 │
+		│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2004        │         1520481.0 │
+		└─────────┴─────────┴─────────┴─────────┴─────────┴─────────────┴───────────────────┘
 
 ```
 
