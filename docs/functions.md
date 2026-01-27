@@ -8,6 +8,7 @@
 | [`EUROSTAT_Dataflows`](#eurostat_dataflows) | Returns info of the dataflows provided by EUROSTAT Providers. |
 | [`EUROSTAT_Endpoints`](#eurostat_endpoints) | Returns the list of supported EUROSTAT API Endpoints. |
 | [`EUROSTAT_DataStructure`](#eurostat_datastructure) | Returns information of the data structure of an EUROSTAT Dataflow. |
+| [`EUROSTAT_Read`](#eurostat_read) | Returns the dataset of an EUROSTAT Dataflow. |
 
 ----
 
@@ -18,7 +19,7 @@
 #### Signature
 
 ```sql
-EUROSTAT_Dataflows (providers VARCHAR[], dataflows VARCHAR[], language VARCHAR)
+EUROSTAT_Dataflows (providers VARCHAR[] = [], dataflows VARCHAR[] = [], language VARCHAR = 'en')
 ```
 
 #### Description
@@ -97,7 +98,7 @@ EUROSTAT_Endpoints ()
 #### Signature
 
 ```sql
-EUROSTAT_DataStructure ()
+EUROSTAT_DataStructure (provider VARCHAR, dataflow VARCHAR, language VARCHAR = 'en')
 ```
 
 #### Description
@@ -141,7 +142,7 @@ EUROSTAT_DataStructure ()
 #### Signature
 
 ```sql
-EUROSTAT_Read ()
+EUROSTAT_Read (provider VARCHAR, dataflow VARCHAR)
 ```
 
 #### Description
@@ -154,7 +155,7 @@ EUROSTAT_Read ()
 
 ```sql
 
-		SELECT * FROM EUROSTAT_Read('ESTAT', 'demo_r_d2jan') LIMIT 10;
+		SELECT * FROM EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN') LIMIT 5;
 
 		┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────────┬───────────────────┐
 		│  freq   │  unit   │   sex   │   age   │   geo   │ time_period │ observation_value │
@@ -170,4 +171,3 @@ EUROSTAT_Read ()
 ```
 
 ----
-

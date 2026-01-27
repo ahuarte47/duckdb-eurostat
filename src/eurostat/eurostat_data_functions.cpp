@@ -109,15 +109,15 @@ struct ES_Read {
 		// Validate input parameters
 
 		if (provider_id.empty()) {
-			throw InvalidInputException("EUROSTAT_Read: first parameter, the 'provider' identifier, cannot be empty.");
+			throw InvalidInputException("EUROSTAT: First parameter, the 'provider' identifier, cannot be empty.");
 		}
 
 		if (dataflow_id.empty()) {
-			throw InvalidInputException("EUROSTAT_Read: second parameter, the 'dataflow' code, cannot be empty.");
+			throw InvalidInputException("EUROSTAT: Second parameter, the 'dataflow' code, cannot be empty.");
 		}
 
 		if (eurostat::ENDPOINTS.find(provider_id) == eurostat::ENDPOINTS.end()) {
-			throw InvalidInputException("Unknown EUROSTAT Endpoint '%s'.", provider_id.c_str());
+			throw InvalidInputException("EUROSTAT: Unknown Endpoint '%s'.", provider_id.c_str());
 		}
 
 		// Execute HTTP GET request
@@ -130,11 +130,11 @@ struct ES_Read {
 		    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
 
 		if (response.status_code != 200) {
-			throw IOException("Failed to fetch EUROSTAT dataflow dataset from provider='%s', dataflow='%s': (%d) %s",
+			throw IOException("EUROSTAT: Failed to fetch a dataset from provider='%s', dataflow='%s': (%d) %s",
 			                  provider_id.c_str(), dataflow_id.c_str(), response.status_code, response.error.c_str());
 		}
 		if (!response.error.empty()) {
-			throw IOException(response.error);
+			throw IOException("EUROSTAT: " + response.error);
 		}
 
 		// Parse TSV response (Header + Rows)
@@ -152,7 +152,7 @@ struct ES_Read {
 					size_t pos = line.find("\\TIME_PERIOD");
 
 					if (pos == string::npos) {
-						throw IOException("TIME_PERIOD not found in TSV header");
+						throw IOException("EUROSTAT: TIME_PERIOD not found in TSV header.");
 					}
 
 					// Extract dimension column names (before TIME_PERIOD)
@@ -278,7 +278,7 @@ struct ES_Read {
 	)";
 
 	static constexpr auto EXAMPLE = R"(
-		SELECT * FROM EUROSTAT_Read('ESTAT', 'demo_r_d2jan') LIMIT 5;
+		SELECT * FROM EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN') LIMIT 5;
 
 		┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────────┬───────────────────┐
 		│  freq   │  unit   │   sex   │   age   │   geo   │ time_period │ observation_value │

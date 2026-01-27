@@ -164,12 +164,11 @@ struct ES_Dataflows {
 		yyjson_val *attrib_val = nullptr;
 
 		if (!yyjson_is_obj(extension_val = yyjson_obj_get(object_val, "extension"))) {
-			throw InvalidInputException(
-			    "Invalid EUROSTAT dataflow metadata: missing or incorrect 'extension' attribute.");
+			throw InvalidInputException("EUROSTAT: Missing or incorrect 'extension' attribute in dataflow metadata.");
 		}
 		if (!yyjson_is_arr(annotation_val = yyjson_obj_get(extension_val, "annotation"))) {
 			throw InvalidInputException(
-			    "Invalid EUROSTAT dataflow metadata: missing or incorrect 'extension/annotation' attribute.");
+			    "EUROSTAT: Missing or incorrect 'extension/annotation' attribute in dataflow metadata.");
 		}
 
 		// Extract main attributes
@@ -328,7 +327,7 @@ struct ES_Dataflows {
 
 					// Validate Endpoint name
 					if (eurostat::ENDPOINTS.find(value) == eurostat::ENDPOINTS.end()) {
-						throw InvalidInputException("Unknown EUROSTAT Endpoint '%s'.", value.c_str());
+						throw InvalidInputException("EUROSTAT: Unknown Endpoint '%s'.", value.c_str());
 					}
 					providers.push_back(value);
 				}
@@ -404,18 +403,18 @@ struct ES_Dataflows {
 
 				if (response.status_code != 200) {
 					throw IOException(
-					    "Failed to fetch EUROSTAT dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
+					    "EUROSTAT: Failed to fetch dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
 					    provider_id.c_str(), dataflow_id.c_str(), response.status_code, response.error.c_str());
 				}
 				if (!response.error.empty()) {
-					throw IOException(response.error);
+					throw IOException("EUROSTAT: " + response.error);
 				}
 
 				// Parse JSON response
 
 				const auto json_data = yyjson_read(response.body.c_str(), response.body.size(), YYJSON_READ_NOFLAG);
 				if (!json_data) {
-					throw IOException("Failed to parse EUROSTAT dataflow metadata from provider='%s', dataflow='%s'.",
+					throw IOException("EUROSTAT: Failed to parse dataflow metadata from provider='%s', dataflow='%s'.",
 					                  provider_id.c_str(), dataflow_id.c_str());
 				}
 
@@ -429,12 +428,11 @@ struct ES_Dataflows {
 						yyjson_val *item_val = nullptr;
 
 						if (!yyjson_is_obj(link_val = yyjson_obj_get(root_val, "link"))) {
-							throw InvalidInputException(
-							    "Invalid EUROSTAT dataflow metadata: missing 'link' attribute.");
+							throw InvalidInputException("EUROSTAT: Missing 'link' attribute in dataflow metadata.");
 						}
 						if (!yyjson_is_arr(item_val = yyjson_obj_get(link_val, "item"))) {
 							throw InvalidInputException(
-							    "Invalid EUROSTAT dataflow metadata: missing 'link/item' attribute.");
+							    "EUROSTAT: Missing 'link/item' attribute in dataflow metadata.");
 						}
 
 						auto array_len = yyjson_arr_size(item_val);
@@ -670,11 +668,11 @@ struct ES_DataStructure {
 		    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
 
 		if (response.status_code != 200) {
-			throw IOException("Failed to fetch EUROSTAT dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
+			throw IOException("EUROSTAT: Failed to fetch dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
 			                  provider_id.c_str(), dataflow_id.c_str(), response.status_code, response.error.c_str());
 		}
 		if (!response.error.empty()) {
-			throw IOException(response.error);
+			throw IOException("EUROSTAT: " + response.error);
 		}
 
 		// Get the dimensions from XML response
@@ -776,11 +774,11 @@ struct ES_DataStructure {
 		    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
 
 		if (response.status_code != 200) {
-			throw IOException("Failed to fetch EUROSTAT dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
+			throw IOException("EUROSTAT: Failed to fetch dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
 			                  provider_id.c_str(), dataflow_id.c_str(), response.status_code, response.error.c_str());
 		}
 		if (!response.error.empty()) {
-			throw IOException(response.error);
+			throw IOException("EUROSTAT: " + response.error);
 		}
 
 		// Get the different values of dimensions from XML response
@@ -855,17 +853,15 @@ struct ES_DataStructure {
 		// Validate input parameters
 
 		if (provider_id.empty()) {
-			throw InvalidInputException(
-			    "EUROSTAT_DataStructure: first parameter, the 'provider' identifier, cannot be empty.");
+			throw InvalidInputException("EUROSTAT: First parameter, the 'provider' identifier, cannot be empty.");
 		}
 
 		if (dataflow_id.empty()) {
-			throw InvalidInputException(
-			    "EUROSTAT_DataStructure: second parameter, the 'dataflow' code, cannot be empty.");
+			throw InvalidInputException("EUROSTAT: Second parameter, the 'dataflow' code, cannot be empty.");
 		}
 
 		if (eurostat::ENDPOINTS.find(provider_id) == eurostat::ENDPOINTS.end()) {
-			throw InvalidInputException("Unknown EUROSTAT Endpoint '%s'.", provider_id.c_str());
+			throw InvalidInputException("EUROSTAT: Unknown Endpoint '%s'.", provider_id.c_str());
 		}
 
 		// Extract desired Language from named parameters

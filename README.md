@@ -34,7 +34,7 @@ Then you can use the extension to read metadata and datasets from EUROSTAT datab
 
 This is the list of available functions:
 
-+ ### EUROSTAT_Endpoints()
++ ### EUROSTAT_Endpoints
 
     Returns the list of supported EUROSTAT API Endpoints.
 
@@ -53,7 +53,7 @@ This is the list of available functions:
 	└─────────────┴──────────────┴──────────────────────────────────────────────────────┘
     ```
 
-+ ### EUROSTAT_Dataflows()
++ ### EUROSTAT_Dataflows
 
     Returns info of the dataflows provided by EUROSTAT Providers.
 
@@ -83,7 +83,7 @@ This is the list of available functions:
 	└─────────────┴──────────────┴─────────┴─────────┴───────────────────────────────────────────────────────────────────┘
     ```
 
-+ ### EUROSTAT_DataStructure()
++ ### EUROSTAT_DataStructure
 
     Returns information of the data structure of an EUROSTAT Dataflow.
 
@@ -111,12 +111,12 @@ This is the list of available functions:
 	└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
     ```
 
-+ ### EUROSTAT_Read()
++ ### EUROSTAT_Read
 
     Reads the dataset of an EUROSTAT Dataflow.
 
     ```sql
-	SELECT * FROM EUROSTAT_Read('ESTAT', 'demo_r_d2jan') LIMIT 5;
+	SELECT * FROM EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN') LIMIT 5;
 
 	┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────────┬───────────────────┐
 	│  freq   │  unit   │   sex   │   age   │   geo   │ time_period │ observation_value │
