@@ -1,0 +1,35 @@
+# name: test/sql/eurostat_geolevel.test
+# description: test eurostat extension
+# group: [sql]
+
+require eurostat
+
+query I
+SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE');
+----
+country
+
+query I
+SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE1');
+----
+nuts1
+
+query I
+SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE12');
+----
+nuts2
+
+query I
+SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE123');
+----
+nuts3
+
+query I
+SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE_DEL1');
+----
+city
+
+query I
+SELECT EUROSTAT_GetGeoLevelFromGeoCode('EU27_2020');
+----
+aggregate

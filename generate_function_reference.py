@@ -59,14 +59,52 @@ def main():
 
         print("Collecting functions")
 
+        scalar_functions = get_functions('scalar')
         table_functions = get_functions('table')
 
         # Write function index
         f.write("## Function Index \n")
+        f.write("**[Scalar Functions](#scalar-functions)**\n\n")
+        write_table_of_contents(f, scalar_functions)
+        f.write("\n")
         f.write("**[Table Functions](#table-functions)**\n\n")
         write_table_of_contents(f, table_functions)
         f.write("\n")
         f.write("----\n\n")
+
+        # Write basic functions
+        for func_set in [('Scalar Functions', scalar_functions)]:
+            f.write(f"## {func_set[0]}\n\n")
+            set_name = func_set[0]
+            for function in func_set[1]:
+                f.write(f"### {function['name']}\n\n\n")
+                #summary = function['description'].split('\n')[0]
+                #f.write(f"_{summary}_\n\n")
+
+                f.write("#### Signature\n\n") if len(function['signatures']) == 1 else f.write("#### Signatures\n\n")
+                f.write("```sql\n")
+                for signature in function['signatures']:
+                    param_list = ", ".join([f"{param['name']} {param['type']}" for param in signature['params']])
+                    f.write(f"{signature['return']} {function['name']} ({param_list})\n")
+                f.write("```\n\n")
+
+                if function['description']:
+                    f.write("#### Description\n\n")
+                    f.write(function['description'])
+                    f.write("\n\n")
+                else:
+                    print(f"No description for {function['name']}")
+
+                if function['example']:
+                    f.write("#### Example\n\n")
+                    f.write("```sql\n")
+                    f.write(function['example'])
+                    f.write("\n```\n\n")
+                else:
+                    print(f"No example for {function['name']}")
+
+                #f.write("\n\n")
+                f.write("----\n\n")
 
         # Write table functions
         f.write("## Table Functions\n\n")

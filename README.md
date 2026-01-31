@@ -130,6 +130,20 @@ This is the list of available functions:
 	└─────────┴─────────┴─────────┴─────────┴─────────┴─────────────┴───────────────────┘
     ```
 
++ ### EUROSTAT_GetGeoLevelFromGeoCode
+
+	Scalar function that returns the level for a GEO code in the NUTS classification
+	or if it is considered aggregates.
+
+    ```sql
+	SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE');        -- returns 'country'
+	SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE1');       -- returns 'nuts1'
+	SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE12');      -- returns 'nuts2'
+	SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE123');     -- returns 'nuts3'
+	SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE_DEL1');   -- returns 'city'
+	SELECT EUROSTAT_GetGeoLevelFromGeoCode('EU27_2020'); -- returns 'aggregate'
+	```
+
 ### Supported Functions and Documentation
 
 The full list of functions and their documentation is available in the [function reference](docs/functions.md)

@@ -1,6 +1,12 @@
 # DuckDB EUROSTAT Extension Function Reference
 
 ## Function Index
+**[Scalar Functions](#scalar-functions)**
+
+| Function | Summary |
+| --- | --- |
+| [`EUROSTAT_GetGeoLevelFromGeoCode`](#eurostat_getgeolevelfromgeocode) | Returns the level for a GEO code in the NUTS classification or if it is considered aggregates. |
+
 **[Table Functions](#table-functions)**
 
 | Function | Summary |
@@ -9,6 +15,38 @@
 | [`EUROSTAT_Endpoints`](#eurostat_endpoints) | Returns the list of supported EUROSTAT API Endpoints. |
 | [`EUROSTAT_DataStructure`](#eurostat_datastructure) | Returns information of the data structure of an EUROSTAT Dataflow. |
 | [`EUROSTAT_Read`](#eurostat_read) | Returns the dataset of an EUROSTAT Dataflow. |
+
+----
+
+## Scalar Functions
+
+### EUROSTAT_GetGeoLevelFromGeoCode
+
+
+#### Signature
+
+```sql
+VARCHAR EUROSTAT_GetGeoLevelFromGeoCode (geo_code VARCHAR)
+```
+
+#### Description
+
+
+		Returns the level for a GEO code in the NUTS classification or if it is considered aggregates.
+
+
+#### Example
+
+```sql
+
+		SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE');        -- returns 'country'
+		SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE1');       -- returns 'nuts1'
+		SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE12');      -- returns 'nuts2'
+		SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE123');     -- returns 'nuts3'
+		SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE_DEL1');   -- returns 'city'
+		SELECT EUROSTAT_GetGeoLevelFromGeoCode('EU27_2020'); -- returns 'aggregate'
+
+```
 
 ----
 

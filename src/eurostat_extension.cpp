@@ -9,6 +9,7 @@
 // EUROSTAT
 #include "eurostat/eurostat_data_functions.hpp"
 #include "eurostat/eurostat_info_functions.hpp"
+#include "eurostat/eurostat_scalar_functions.hpp"
 
 namespace duckdb {
 
@@ -16,6 +17,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	// Register functions
 	EurostatDataFunctions::Register(loader);
 	EurostatInfoFunctions::Register(loader);
+	EurostatScalarFunctions::Register(loader);
 }
 
 void EurostatExtension::Load(ExtensionLoader &loader) {
