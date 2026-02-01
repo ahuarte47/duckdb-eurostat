@@ -112,6 +112,10 @@ This is the list of available functions:
 	└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
     ```
 
+	`geo_level` is a dimension that is not part of the dataflow source, but it is computed based
+	on the `geo` dimension values. See the function [EUROSTAT_GetGeoLevelFromGeoCode](#eurostat_getgeolevelfromgeocode) below for
+	more details.
+
 + ### EUROSTAT_Read
 
     Reads the dataset of an EUROSTAT Dataflow.
@@ -119,16 +123,16 @@ This is the list of available functions:
     ```sql
 	SELECT * FROM EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN') LIMIT 5;
 
-	┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────────┬───────────────────┐
-	│  freq   │  unit   │   sex   │   age   │   geo   │ time_period │ observation_value │
-	│ varchar │ varchar │ varchar │ varchar │ varchar │   varchar   │      double       │
-	├─────────┼─────────┼─────────┼─────────┼─────────┼─────────────┼───────────────────┤
-	│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2000        │         1526762.0 │
-	│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2001        │         1535822.0 │
-	│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2002        │         1532563.0 │
-	│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2003        │         1526180.0 │
-	│ A       │ NR      │ F       │ TOTAL   │ AL      │ 2004        │         1520481.0 │
-	└─────────┴─────────┴─────────┴─────────┴─────────┴─────────────┴───────────────────┘
+	┌─────────┬─────────┬─────────┬─────────┬─────────┬───────────┬─────────────┬───────────────────┐
+	│  freq   │  unit   │   sex   │   age   │   geo   │ geo_level │ TIME_PERIOD │ observation_value │
+	│ varchar │ varchar │ varchar │ varchar │ varchar │  varchar  │   varchar   │      double       │
+	├─────────┼─────────┼─────────┼─────────┼─────────┼───────────┼─────────────┼───────────────────┤
+	│ A       │ NR      │ F       │ TOTAL   │ AL      │ country   │ 2000        │         1526762.0 │
+	│ A       │ NR      │ F       │ TOTAL   │ AL      │ country   │ 2001        │         1535822.0 │
+	│ A       │ NR      │ F       │ TOTAL   │ AL      │ country   │ 2002        │         1532563.0 │
+	│ A       │ NR      │ F       │ TOTAL   │ AL      │ country   │ 2003        │         1526180.0 │
+	│ A       │ NR      │ F       │ TOTAL   │ AL      │ country   │ 2004        │         1520481.0 │
+	└─────────┴─────────┴─────────┴─────────┴─────────┴───────────┴─────────────┴───────────────────┘
     ```
 
 + ### EUROSTAT_GetGeoLevelFromGeoCode
@@ -144,6 +148,20 @@ This is the list of available functions:
 	SELECT EUROSTAT_GetGeoLevelFromGeoCode('DE_DEL1');   -- returns 'city'
 	SELECT EUROSTAT_GetGeoLevelFromGeoCode('EU27_2020'); -- returns 'aggregate'
 	```
+
+	This scalar function is used by the `EUROSTAT_Read` function to add the `geo_level`
+	dimension as a normal column.
+
+	The supported levels are:
+	- aggregate
+	- country
+	- nuts1
+	- nuts2
+	- nuts3
+	- city
+
+	See more details about `geo_level` [here](https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-getting-started/api#APIGettingstartedwithstatisticsAPI-FilteringongeoLevel).
+
 
 ### Supported Functions and Documentation
 
