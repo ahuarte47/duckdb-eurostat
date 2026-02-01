@@ -4,6 +4,7 @@
 
 // DuckDB
 #include "duckdb/main/database.hpp"
+#include "duckdb/main/client_context.hpp"
 #include "duckdb/main/extension/extension_loader.hpp"
 #include "duckdb/common/types/timestamp.hpp"
 #include "duckdb/function/table_function.hpp"
@@ -648,7 +649,7 @@ struct ES_DataStructure {
 		string id;
 		string concept_id;
 		string concept_label;
-		string values;
+		std::vector<string> values;
 	};
 
 	//! Returns the basic data structure of an EUROSTAT Dataflow.
@@ -713,6 +714,16 @@ struct ES_DataStructure {
 							xmlXPathFreeContext(local_ctx);
 						}
 						dimensions.emplace_back(dim);
+
+						// Do we can add the virtual GEO_LEVEL dimension ?
+						if (StringUtil::Lower(dim.id) == "geo") {
+							Dimension d;
+							d.position = -1;
+							d.id = "geo_level";
+							d.concept_label = "NUTS classification level";
+							d.values.assign({"aggregate", "country", "nuts1", "nuts2", "nuts3", "city"});
+							dimensions.emplace_back(d);
+						}
 					}
 				}
 			}
@@ -797,21 +808,11 @@ struct ES_DataStructure {
 					for (auto &dim : dimensions) {
 						if (dim.id == dim_id) {
 
-							std::ostringstream code_values;
-							code_values << "[";
-
 							for (xmlNodePtr child = node->children; child; child = child->next) {
 								if (strcmp((const char *)child->name, "Value") == 0) {
 									string code_value = XmlUtils::GetNodeTextContent(child);
-									code_values << '"' << code_value << "\",";
+									dim.values.emplace_back(code_value);
 								}
-							}
-							if (code_values.tellp() > 1) {
-								code_values.seekp(-1, std::ios_base::end); // Remove last comma
-								code_values << "]";
-								dim.values = code_values.str();
-							} else {
-								dim.values = "[]";
 							}
 							break;
 						}
@@ -965,7 +966,22 @@ struct ES_DataStructure {
 			if (dimension.values.empty()) {
 				output.data[5].SetValue(row_idx, Value());
 			} else {
-				output.data[5].SetValue(row_idx, dimension.values);
+				std::ostringstream values_stream;
+				values_stream << "[";
+				string values_str;
+
+				for (const auto &val : dimension.values) {
+					values_stream << '"' << val << "\",";
+				}
+				if (values_stream.tellp() > 1) {
+					values_stream.seekp(-1, std::ios_base::end); // Remove last comma
+					values_stream << "]";
+					values_str = values_stream.str();
+				} else {
+					values_str = "[]";
+				}
+
+				output.data[5].SetValue(row_idx, values_str);
 			}
 		}
 
@@ -1004,6 +1020,7 @@ struct ES_DataStructure {
 		│ ESTAT       │ DEMO_R_D2JAN │        3 │ sex         │ Sex                             │
 		│ ESTAT       │ DEMO_R_D2JAN │        4 │ age         │ Age class                       │
 		│ ESTAT       │ DEMO_R_D2JAN │        5 │ geo         │ Geopolitical entity (reporting) │
+		│ ESTAT       │ DEMO_R_D2JAN │       -1 │ geo_level   │ NUTS classification level       │
 		│ ESTAT       │ DEMO_R_D2JAN │        6 │ time_period │ Time                            │
 		└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
 	)";
@@ -1032,6 +1049,20 @@ struct ES_DataStructure {
 // #####################################################################################################################
 // Register Metadata/Info Functions
 // #####################################################################################################################
+
+//! Returns the data structure (dimensions) of a given dataflow
+std::vector<eurostat::Dimension> EurostatUtils::DataStructureOf(ClientContext &context, const std::string &provider_id,
+                                                                const std::string &dataflow_id) {
+
+	auto dimensions = ES_DataStructure::GetBasicDataSchema(context, provider_id, dataflow_id, "en");
+	std::vector<eurostat::Dimension> data_structure;
+
+	for (const auto &dim : dimensions) {
+		auto d = eurostat::Dimension {dim.position, dim.id, dim.concept_label};
+		data_structure.emplace_back(d);
+	}
+	return data_structure;
+}
 
 void EurostatInfoFunctions::Register(ExtensionLoader &loader) {
 

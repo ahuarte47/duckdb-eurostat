@@ -168,6 +168,7 @@ EUROSTAT_DataStructure (provider VARCHAR, dataflow VARCHAR, language VARCHAR = '
 		│ ESTAT       │ DEMO_R_D2JAN │        3 │ sex         │ Sex                             │
 		│ ESTAT       │ DEMO_R_D2JAN │        4 │ age         │ Age class                       │
 		│ ESTAT       │ DEMO_R_D2JAN │        5 │ geo         │ Geopolitical entity (reporting) │
+		│ ESTAT       │ DEMO_R_D2JAN │       -1 │ geo_level   │ NUTS classification level       │
 		│ ESTAT       │ DEMO_R_D2JAN │        6 │ time_period │ Time                            │
 		└─────────────┴──────────────┴──────────┴─────────────┴─────────────────────────────────┘
 

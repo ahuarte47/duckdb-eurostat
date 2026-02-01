@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -122,6 +123,11 @@ struct Dimension {
 	int32_t position = -1;
 	std::string name;
 	std::string concept_label;
+
+	Dimension() = default;
+	Dimension(int32_t position, const std::string &name, const std::string &concept_label)
+	    : position(position), name(name), concept_label(concept_label) {
+	}
 
 	//! Get the level for a GEO code in the NUTS classification or if it is considered aggregates.
 	static std::string GetGeoLevelFromGeoCode(const std::string &geo_code);

@@ -51,7 +51,7 @@ struct ES_Read {
 	};
 
 	//! Parse a data row from a TSV line
-	static bool ParseDatarow(const string &line, BindData &bind_data) {
+	static bool ParseDatarow(const string &line, int32_t geo_column_index, BindData &bind_data) {
 
 		// Split line by tabs
 		std::istringstream line_stream(line);
@@ -72,6 +72,10 @@ struct ES_Read {
 
 		while (std::getline(dim_stream, token, ',')) {
 			dim_values.values.push_back(token);
+		}
+		if (geo_column_index != -1) {
+			auto geo_level = eurostat::Dimension::GetGeoLevelFromGeoCode(dim_values.values[geo_column_index]);
+			dim_values.values.push_back(geo_level);
 		}
 
 		bind_data.dimensions.emplace_back(dim_values);
@@ -145,6 +149,7 @@ struct ES_Read {
 		std::istringstream line_stream(response.body);
 		std::string line, token;
 		int64_t line_index = 0;
+		int32_t geo_column_index = -1;
 
 		while (std::getline(line_stream, line)) {
 			if (!line.empty()) {
@@ -163,6 +168,13 @@ struct ES_Read {
 						token = StringUtil::Lower(token);
 						names.emplace_back(token);
 						return_types.push_back(LogicalType::VARCHAR);
+
+						// Add GEO_LEVEL virtual dimension
+						if (token == "geo") {
+							geo_column_index = names.size() - 1;
+							names.emplace_back("geo_level");
+							return_types.push_back(LogicalType::VARCHAR);
+						}
 					}
 
 					names.emplace_back("time_period");
@@ -185,7 +197,7 @@ struct ES_Read {
 
 				} else {
 					// Add data row
-					ParseDatarow(line, the_data);
+					ParseDatarow(line, geo_column_index, the_data);
 				}
 				line_index++;
 			}

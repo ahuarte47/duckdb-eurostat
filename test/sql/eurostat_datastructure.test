@@ -17,6 +17,7 @@ ORDER BY
     position
 ;
 ----
+ESTAT	DEMO_R_D2JAN	-1	geo_level	NUTS classification level
 ESTAT	DEMO_R_D2JAN	1	freq	Time frequency
 ESTAT	DEMO_R_D2JAN	2	unit	Unit of measure
 ESTAT	DEMO_R_D2JAN	3	sex	Sex
