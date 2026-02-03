@@ -693,7 +693,7 @@ struct ES_DataStructure {
 					auto dim_id = XmlUtils::GetNodeAttributeValue(node, "id");
 					if (!dim_id.empty()) {
 						Dimension dim;
-						dim.id = dim_id;
+						dim.id = StringUtil::Lower(dim_id);
 						dim.position = std::atoi(XmlUtils::GetNodeAttributeValue(node, "position").c_str());
 
 						// Get the Concept ID for the Dimension
@@ -716,7 +716,7 @@ struct ES_DataStructure {
 						dimensions.emplace_back(dim);
 
 						// Do we can add the virtual GEO_LEVEL dimension ?
-						if (StringUtil::Lower(dim.id) == "geo") {
+						if (dim.id == "geo") {
 							Dimension d;
 							d.position = -1;
 							d.id = "geo_level";
@@ -805,6 +805,8 @@ struct ES_DataStructure {
 
 				auto dim_id = XmlUtils::GetNodeAttributeValue(node, "id");
 				if (!dim_id.empty()) {
+					dim_id = StringUtil::Lower(dim_id);
+
 					for (auto &dim : dimensions) {
 						if (dim.id == dim_id) {
 
@@ -955,7 +957,7 @@ struct ES_DataStructure {
 			output.data[0].SetValue(row_idx, bind_data.provider_id);
 			output.data[1].SetValue(row_idx, bind_data.dataflow_id);
 			output.data[2].SetValue(row_idx, dimension.position);
-			output.data[3].SetValue(row_idx, StringUtil::Lower(dimension.id));
+			output.data[3].SetValue(row_idx, dimension.id);
 
 			if (dimension.concept_label.empty()) {
 				output.data[4].SetValue(row_idx, Value());
