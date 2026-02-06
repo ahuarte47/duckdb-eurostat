@@ -135,6 +135,16 @@ This is the list of available functions:
 	└─────────┴─────────┴─────────┴─────────┴─────────┴───────────┴─────────────┴───────────────────┘
     ```
 
+	Extension supports pushdown of T-SQL filters on dimensions, which are encoded and sent to the
+	EUROSTAT API to filter the data before being loaded into DuckDB.
+
+	EUROSTAT API only supports filtering on dimensions with equality conditions (e.g. `WHERE geo = 'DE'`)
+	or IN conditions (e.g. `WHERE geo IN ('DE', 'FR')`). Other types of filters (e.g. `WHERE geo LIKE 'D%'`)
+	are not supported and will be evaluated locally in DuckDB after loading the data.
+
+	Time filters (e.g. `WHERE time_period >= '2000' AND time_period <= '2010'`) are also supported
+	and will be encoded as range filters in the EUROSTAT API.
+
 + ### EUROSTAT_GetGeoLevelFromGeoCode
 
 	Scalar function that returns the level for a GEO code in the NUTS classification

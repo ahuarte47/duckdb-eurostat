@@ -9,6 +9,8 @@ SELECT
     *
 FROM
     EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN')
+WHERE
+    geo = 'AL' AND time_period <= '2004'
 LIMIT
     5
 ;
@@ -18,3 +20,25 @@ A	NR	F	TOTAL	AL	country	2001	1535822.0
 A	NR	F	TOTAL	AL	country	2002	1532563.0
 A	NR	F	TOTAL	AL	country	2003	1526180.0
 A	NR	F	TOTAL	AL	country	2004	1520481.0
+
+# Applying filter pushdown
+
+query III
+SELECT
+    geo, time_period, sex
+FROM
+    EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN')
+WHERE
+    geo IN ('PT', 'ES') AND time_period IN ('2001', '2002', '2003') AND sex = 'F'
+GROUP BY
+    geo, time_period, sex
+ORDER BY
+    geo, time_period, sex
+;
+----
+ES	2001	F
+ES	2002	F
+ES	2003	F
+PT	2001	F
+PT	2002	F
+PT	2003	F

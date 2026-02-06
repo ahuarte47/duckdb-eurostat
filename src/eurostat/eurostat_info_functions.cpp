@@ -641,6 +641,8 @@ static constexpr const char *ES_CONCEPT_PATH = "/m:Structure/m:Structures/s:Conc
 static constexpr const char *ES_VALUES_PATH =
     "/m:Structure/m:Structures/s:Constraints/s:ContentConstraint/s:CubeRegion/c:KeyValue";
 
+static constexpr const char *ES_ERROR_PATH = "/S:Fault/faultstring";
+
 struct ES_DataStructure {
 
 	//! Information of a Dimension of an EUROSTAT Dataflow
@@ -1064,6 +1066,29 @@ std::vector<eurostat::Dimension> EurostatUtils::DataStructureOf(ClientContext &c
 		data_structure.emplace_back(d);
 	}
 	return data_structure;
+}
+
+//! Extracts the error message of a given Eurostat API response body
+std::string EurostatUtils::GetXmlErrorMessage(const std::string &response_body) {
+
+	XmlDocument document = XmlDocument(response_body);
+	xmlXPathContextPtr xpath_ctx = document.GetXPathContext();
+	xmlXPathObjectPtr xpath_obj = nullptr;
+
+	string error_msg;
+
+	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_ERROR_PATH, xpath_ctx)) && xpath_obj->nodesetval &&
+	    xpath_obj->nodesetval->nodeNr > 0) {
+
+		xmlNodePtr node = xpath_obj->nodesetval->nodeTab[0];
+		error_msg = XmlUtils::GetNodeTextContent(node);
+	}
+	if (xpath_obj) {
+		xmlXPathFreeObject(xpath_obj);
+		xpath_obj = nullptr;
+	}
+
+	return error_msg;
 }
 
 void EurostatInfoFunctions::Register(ExtensionLoader &loader) {

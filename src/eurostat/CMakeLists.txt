@@ -3,6 +3,7 @@ set(EXTENSION_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/eurostat.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/http_request.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/xml_element.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/filter_encoder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eurostat_data_functions.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eurostat_info_functions.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eurostat_scalar_functions.cpp
