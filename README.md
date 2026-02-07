@@ -145,6 +145,10 @@ This is the list of available functions:
 	Time filters (e.g. `WHERE time_period >= '2000' AND time_period <= '2010'`) are also supported
 	and will be encoded as range filters in the EUROSTAT API.
 
+	The `geo_level` dimension is not part of the dataflow source, but it is computed based on the `geo` dimension
+	values. You can filter on it as well (e.g. `WHERE geo_level = 'country'`), but it will be evaluated locally
+	in DuckDB after loading the data.
+
 + ### EUROSTAT_GetGeoLevelFromGeoCode
 
 	Scalar function that returns the level for a GEO code in the NUTS classification
