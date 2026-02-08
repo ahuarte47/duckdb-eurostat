@@ -138,6 +138,20 @@ struct ES_Endpoints {
 
 struct ES_Dataflows {
 
+#define INFO_COLUMN_PROVIDER_ID      0
+#define INFO_COLUMN_DATAFLOW_ID      1
+#define INFO_COLUMN_TYPE             2
+#define INFO_COLUMN_VERSION          3
+#define INFO_COLUMN_LABEL            4
+#define INFO_COLUMN_LANGUAGE         5
+#define INFO_COLUMN_NUMBER_OF_VALUES 6
+#define INFO_COLUMN_DATA_START       7
+#define INFO_COLUMN_DATA_END         8
+#define INFO_COLUMN_UPDATE_DATA      9
+#define INFO_COLUMN_UPDATE_STRUCTURE 10
+#define INFO_COLUMN_DATA_STRUCTURE   11
+#define INFO_COLUMN_ANNOTATIONS      12
+
 	//! Metadata of an EUROSTAT Dataflow
 	struct DataflowInfo {
 		string provider_id;
@@ -158,7 +172,8 @@ struct ES_Dataflows {
 	};
 
 	//! Parse DataflowInfo from JSON object
-	inline static DataflowInfo ParseDataflowInfo(const string &provider_id, yyjson_val *object_val) {
+	inline static DataflowInfo ParseDataflow(const string &provider_id, yyjson_val *object_val,
+	                                         bool &load_datastructure, bool &load_annotations) {
 
 		yyjson_val *extension_val = nullptr;
 		yyjson_val *annotation_val = nullptr;
@@ -193,14 +208,14 @@ struct ES_Dataflows {
 			info.language = string(yyjson_get_str(attrib_val));
 		}
 
-		if (yyjson_is_obj(attrib_val = yyjson_obj_get(extension_val, "datastructure"))) {
+		if (load_datastructure && yyjson_is_obj(attrib_val = yyjson_obj_get(extension_val, "datastructure"))) {
 			const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
 			if (json) {
 				info.data_structure = string(json);
 				free((void *)json);
 			}
 		}
-		if (yyjson_is_arr(attrib_val = yyjson_obj_get(extension_val, "annotation"))) {
+		if (load_annotations && yyjson_is_arr(attrib_val = yyjson_obj_get(extension_val, "annotation"))) {
 			const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
 			if (json) {
 				info.annotations = string(json);
@@ -273,8 +288,13 @@ struct ES_Dataflows {
 	//------------------------------------------------------------------------------------------------------------------
 
 	struct BindData final : TableFunctionData {
-		std::vector<DataflowInfo> rows;
-		explicit BindData(const std::vector<DataflowInfo> &rows) : rows(std::move(rows)) {
+		std::vector<string> providers;
+		std::vector<string> dataflows;
+		string language;
+
+		explicit BindData(const std::vector<string> &providers, const std::vector<string> &dataflows,
+		                  const string &language)
+		    : providers(std::move(providers)), dataflows(std::move(dataflows)), language(std::move(language)) {
 		}
 	};
 
@@ -379,6 +399,38 @@ struct ES_Dataflows {
 			language = "en";
 		}
 
+		return make_uniq_base<FunctionData, BindData>(providers, dataflows, language);
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Init
+	//------------------------------------------------------------------------------------------------------------------
+
+	struct State final : GlobalTableFunctionState {
+		std::vector<column_t> column_ids;
+		std::vector<DataflowInfo> rows;
+		idx_t current_row;
+
+		explicit State(const std::vector<column_t> &column_ids, const std::vector<DataflowInfo> &rows)
+		    : column_ids(std::move(column_ids)), rows(std::move(rows)), current_row(0) {
+		}
+	};
+
+	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
+
+		const auto &bind_data = input.bind_data->Cast<BindData>();
+		const auto &providers = bind_data.providers;
+		const auto &dataflows = bind_data.dataflows;
+		const auto &language = bind_data.language;
+
+		std::vector<column_t> column_ids;
+		std::copy(input.column_ids.begin(), input.column_ids.end(), std::back_inserter(column_ids));
+
+		bool load_datastructure =
+		    std::find(column_ids.begin(), column_ids.end(), INFO_COLUMN_DATA_STRUCTURE) != column_ids.end();
+		bool load_annotations =
+		    std::find(column_ids.begin(), column_ids.end(), INFO_COLUMN_ANNOTATIONS) != column_ids.end();
+
 		// Get the dataflow metadata collection (synchronously for now)
 
 		std::vector<DataflowInfo> rows;
@@ -440,12 +492,12 @@ struct ES_Dataflows {
 
 						for (size_t i = 0; i < array_len; i++) {
 							auto elem_val = yyjson_arr_get(item_val, i);
-							auto dataflow_info = ParseDataflowInfo(provider_id, elem_val);
-							rows.push_back(dataflow_info);
+							auto info = ParseDataflow(provider_id, elem_val, load_datastructure, load_annotations);
+							rows.push_back(info);
 						}
 					} else if (yyjson_is_obj(root_val)) {
-						auto dataflow_info = ParseDataflowInfo(provider_id, root_val);
-						rows.push_back(dataflow_info);
+						auto info = ParseDataflow(provider_id, root_val, load_datastructure, load_annotations);
+						rows.push_back(info);
 					}
 
 					// Make sure to free the JSON document
@@ -459,37 +511,7 @@ struct ES_Dataflows {
 			}
 		}
 
-		return make_uniq_base<FunctionData, BindData>(rows);
-	}
-
-	//------------------------------------------------------------------------------------------------------------------
-	// Init
-	//------------------------------------------------------------------------------------------------------------------
-
-	struct State final : GlobalTableFunctionState {
-		idx_t current_row;
-		explicit State() : current_row(0) {
-		}
-	};
-
-	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-		return make_uniq_base<GlobalTableFunctionState, State>();
-	}
-
-	//------------------------------------------------------------------------------------------------------------------
-	// Cardinality
-	//------------------------------------------------------------------------------------------------------------------
-
-	static unique_ptr<NodeStatistics> Cardinality(ClientContext &context, const FunctionData *data) {
-
-		auto &bind_data = data->Cast<BindData>();
-		auto result = make_uniq<NodeStatistics>();
-
-		// This is the maximum number of points in a single file
-		result->has_max_cardinality = true;
-		result->max_cardinality = bind_data.rows.size();
-
-		return result;
+		return make_uniq_base<GlobalTableFunctionState, State>(column_ids, rows);
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -498,11 +520,10 @@ struct ES_Dataflows {
 
 	static void Execute(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
 
-		auto &bind_data = input.bind_data->Cast<BindData>();
 		auto &gstate = input.global_state->Cast<State>();
 
 		// Calculate how many record we can fit in the output
-		const auto output_size = std::min<idx_t>(STANDARD_VECTOR_SIZE, bind_data.rows.size() - gstate.current_row);
+		const auto output_size = std::min<idx_t>(STANDARD_VECTOR_SIZE, gstate.rows.size() - gstate.current_row);
 		const auto current_row = gstate.current_row;
 
 		if (output_size == 0) {
@@ -512,57 +533,85 @@ struct ES_Dataflows {
 
 		// Load current subset of rows.
 		for (idx_t row_idx = 0, record_idx = current_row; row_idx < output_size; row_idx++, record_idx++) {
-			const auto &dataflow_info = bind_data.rows[record_idx];
+			const auto &dataflow_info = gstate.rows[record_idx];
 
-			output.data[0].SetValue(row_idx, dataflow_info.provider_id);
-			output.data[1].SetValue(row_idx, dataflow_info.dataflow_id);
-			output.data[2].SetValue(row_idx, dataflow_info.type);
-			output.data[3].SetValue(row_idx, dataflow_info.version);
-			output.data[4].SetValue(row_idx, dataflow_info.label);
-			output.data[5].SetValue(row_idx, dataflow_info.language);
+			for (idx_t col_idx = 0; col_idx < gstate.column_ids.size(); col_idx++) {
+				const auto &dim_index = gstate.column_ids[col_idx];
 
-			if (dataflow_info.number_of_values == -1) {
-				output.data[6].SetValue(row_idx, Value());
-			} else {
-				output.data[6].SetValue(row_idx, dataflow_info.number_of_values);
-			}
-
-			if (dataflow_info.data_start.empty()) {
-				output.data[7].SetValue(row_idx, Value());
-			} else {
-				output.data[7].SetValue(row_idx, dataflow_info.data_start);
-			}
-
-			if (dataflow_info.data_end.empty()) {
-				output.data[8].SetValue(row_idx, Value());
-			} else {
-				output.data[8].SetValue(row_idx, dataflow_info.data_end);
-			}
-
-			if (dataflow_info.update_data.empty()) {
-				output.data[9].SetValue(row_idx, Value());
-			} else {
-				timestamp_t value = Timestamp::FromString(dataflow_info.update_data, true);
-				output.data[9].SetValue(row_idx, Value::TIMESTAMPTZ(timestamp_tz_t(value)));
-			}
-
-			if (dataflow_info.update_structure.empty()) {
-				output.data[10].SetValue(row_idx, Value());
-			} else {
-				timestamp_t value = Timestamp::FromString(dataflow_info.update_structure, true);
-				output.data[10].SetValue(row_idx, Value::TIMESTAMPTZ(timestamp_tz_t(value)));
-			}
-
-			if (dataflow_info.data_structure.empty()) {
-				output.data[11].SetValue(row_idx, Value());
-			} else {
-				output.data[11].SetValue(row_idx, dataflow_info.data_structure);
-			}
-
-			if (dataflow_info.annotations.empty()) {
-				output.data[12].SetValue(row_idx, Value());
-			} else {
-				output.data[12].SetValue(row_idx, dataflow_info.annotations);
+				// Set the value of the column based on the column index.
+				switch (dim_index) {
+				case INFO_COLUMN_PROVIDER_ID:
+					output.data[col_idx].SetValue(row_idx, dataflow_info.provider_id);
+					break;
+				case INFO_COLUMN_DATAFLOW_ID:
+					output.data[col_idx].SetValue(row_idx, dataflow_info.dataflow_id);
+					break;
+				case INFO_COLUMN_TYPE:
+					output.data[col_idx].SetValue(row_idx, dataflow_info.type);
+					break;
+				case INFO_COLUMN_VERSION:
+					output.data[col_idx].SetValue(row_idx, dataflow_info.version);
+					break;
+				case INFO_COLUMN_LABEL:
+					output.data[col_idx].SetValue(row_idx, dataflow_info.label);
+					break;
+				case INFO_COLUMN_LANGUAGE:
+					output.data[col_idx].SetValue(row_idx, dataflow_info.language);
+					break;
+				case INFO_COLUMN_NUMBER_OF_VALUES:
+					if (dataflow_info.number_of_values == -1) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						output.data[col_idx].SetValue(row_idx, dataflow_info.number_of_values);
+					}
+					break;
+				case INFO_COLUMN_DATA_START:
+					if (dataflow_info.data_start.empty()) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						output.data[col_idx].SetValue(row_idx, dataflow_info.data_start);
+					}
+					break;
+				case INFO_COLUMN_DATA_END:
+					if (dataflow_info.data_end.empty()) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						output.data[col_idx].SetValue(row_idx, dataflow_info.data_end);
+					}
+					break;
+				case INFO_COLUMN_UPDATE_DATA:
+					if (dataflow_info.update_data.empty()) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						timestamp_t value = Timestamp::FromString(dataflow_info.update_data, true);
+						output.data[col_idx].SetValue(row_idx, Value::TIMESTAMPTZ(timestamp_tz_t(value)));
+					}
+					break;
+				case INFO_COLUMN_UPDATE_STRUCTURE:
+					if (dataflow_info.update_structure.empty()) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						timestamp_t value = Timestamp::FromString(dataflow_info.update_structure, true);
+						output.data[col_idx].SetValue(row_idx, Value::TIMESTAMPTZ(timestamp_tz_t(value)));
+					}
+					break;
+				case INFO_COLUMN_DATA_STRUCTURE:
+					if (dataflow_info.data_structure.empty()) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						output.data[col_idx].SetValue(row_idx, dataflow_info.data_structure);
+					}
+					break;
+				case INFO_COLUMN_ANNOTATIONS:
+					if (dataflow_info.annotations.empty()) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						output.data[col_idx].SetValue(row_idx, dataflow_info.annotations);
+					}
+					break;
+				default:
+					break;
+				}
 			}
 		}
 
@@ -617,10 +666,13 @@ struct ES_Dataflows {
 
 		TableFunction func("EUROSTAT_Dataflows", {}, Execute, Bind, Init);
 
-		func.cardinality = Cardinality;
 		func.named_parameters["providers"] = LogicalType::LIST(LogicalType::VARCHAR);
 		func.named_parameters["dataflows"] = LogicalType::LIST(LogicalType::VARCHAR);
 		func.named_parameters["language"] = LogicalType::VARCHAR;
+
+		// Enable projection pushdown - allows DuckDB to tell us which columns are needed
+		// The column_ids will be passed to InitGlobal via TableFunctionInitInput
+		func.projection_pushdown = true;
 
 		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
 	}
