@@ -12,6 +12,15 @@ find_package(LibXml2 REQUIRED)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
+if(EMSCRIPTEN)
+  # _LINKED_LIBS influences only Wasm compilation it's unclear why this is
+  # needed, but somehow some global symbols are not properly
+  # exported otherwise this solves by basically re-linking (at the moment the
+  # Wasm binary is actually produced)
+  set(DUCKDB_EXTENSION_SPATIAL_LINKED_LIBS
+      "../../vcpkg_installed/wasm32-emscripten/lib/lib*.a")
+endif()
+
 project(${TARGET_NAME})
 include_directories(src/include)
 include_directories(${CMAKE_SOURCE_DIR}/third_party/httplib)
