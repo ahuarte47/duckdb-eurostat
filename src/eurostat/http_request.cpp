@@ -6,6 +6,7 @@
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/client_context_file_opener.hpp"
+#include "duckdb/main/settings.hpp"
 #include "zstd.h"
 
 namespace duckdb {
@@ -208,9 +209,9 @@ HttpSettings HttpRequest::ExtractHttpSettings(ClientContext &context, const stri
 	FileOpener::TryGetCurrentSetting(&opener, "http_request_cache", settings.use_cache, &info);
 	FileOpener::TryGetCurrentSetting(&opener, "http_follow_redirects", settings.follow_redirects, &info);
 
-	settings.proxy = config.options.http_proxy;
-	settings.proxy_username = config.options.http_proxy_username;
-	settings.proxy_password = config.options.http_proxy_password;
+	settings.proxy = HTTPProxySetting::GetSetting(context).ToString();
+	settings.proxy_username = HTTPProxyUsernameSetting::GetSetting(context).ToString();
+	settings.proxy_password = HTTPProxyPasswordSetting::GetSetting(context).ToString();
 
 	KeyValueSecretReader secret_reader(opener, &info, "http");
 	string proxy_from_secret;
