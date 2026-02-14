@@ -10,7 +10,6 @@ static void XMLSilentXPathErrorHandler(void *ctx, const xmlError *error) {
 }
 
 XmlDocument::XmlDocument(const std::string &xml_str) : doc(nullptr), xpath_ctx(nullptr) {
-
 	// Parse the XML with options to suppress error messages (thread-safe, per-operation config)
 	// XML_PARSE_NOERROR: suppress error reports to stderr
 	// XML_PARSE_NOWARNING: suppress warning reports to stderr
@@ -45,7 +44,6 @@ XmlDocument::XmlDocument(const std::string &xml_str) : doc(nullptr), xpath_ctx(n
 }
 
 XmlDocument::~XmlDocument() {
-
 	// Reset and free the XML resources
 	if (xpath_ctx) {
 		xmlSetStructuredErrorFunc(xpath_ctx, nullptr);
@@ -60,7 +58,6 @@ XmlDocument::~XmlDocument() {
 
 //! Register all namespace declarations from the document into the XPath context
 void XmlDocument::RegisterNamespaces(xmlXPathContextPtr xpath_ctx) {
-
 	// This enables XPath expressions like "//gml:posList" to work when xmlns:gml="..." is declared.
 	// Without this, libxml2's XPath engine requires manual registration of each namespace prefix.
 	// See: https://grantm.github.io/perl-libxml-by-example/namespaces.html
@@ -135,7 +132,6 @@ XmlElement XmlUtils::ProcessNode(xmlNodePtr node) {
 
 	// Set text content (for element nodes, get direct text content only)
 	if (node->type == XML_ELEMENT_NODE) {
-
 		// Get only direct text children, not all descendants
 		for (xmlNodePtr child = node->children; child; child = child->next) {
 			if (child->type == XML_TEXT_NODE && child->content) {
@@ -152,7 +148,6 @@ XmlElement XmlUtils::ProcessNode(xmlNodePtr node) {
 
 	// Set attributes
 	for (xmlAttrPtr attr = node->properties; attr; attr = attr->next) {
-
 		if (attr->name && attr->children && attr->children->content) {
 			std::string attr_name((const char *)attr->name);
 			std::string attr_value((const char *)attr->children->content);

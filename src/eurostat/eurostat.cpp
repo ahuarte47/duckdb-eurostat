@@ -5,7 +5,6 @@ namespace eurostat {
 
 //! Get the level for a GEO code in the NUTS classification or if it is considered aggregates.
 std::string Dimension::GetGeoLevelFromGeoCode(const std::string &geo_code) {
-
 #define STARTS_WITH(str, prefix) ((strlen(prefix) <= str.size()) && strncmp(str.c_str(), prefix, strlen(prefix)) == 0)
 
 	//

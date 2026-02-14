@@ -29,7 +29,6 @@ namespace {
 //======================================================================================================================
 
 struct ES_Endpoints {
-
 	//------------------------------------------------------------------------------------------------------------------
 	// Bind
 	//------------------------------------------------------------------------------------------------------------------
@@ -42,7 +41,6 @@ struct ES_Endpoints {
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
 	                                     vector<LogicalType> &return_types, vector<string> &names) {
-
 		names.emplace_back("provider_id");
 		return_types.push_back(LogicalType::VARCHAR);
 		names.emplace_back("organization");
@@ -122,7 +120,6 @@ struct ES_Endpoints {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "table");
@@ -137,7 +134,6 @@ struct ES_Endpoints {
 //======================================================================================================================
 
 struct ES_Dataflows {
-
 #define INFO_COLUMN_PROVIDER_ID      0
 #define INFO_COLUMN_DATAFLOW_ID      1
 #define INFO_COLUMN_TYPE             2
@@ -174,7 +170,6 @@ struct ES_Dataflows {
 	//! Parse DataflowInfo from JSON object
 	inline static DataflowInfo ParseDataflow(const string &provider_id, yyjson_val *object_val,
 	                                         bool &load_datastructure, bool &load_annotations) {
-
 		yyjson_val *extension_val = nullptr;
 		yyjson_val *annotation_val = nullptr;
 		yyjson_val *attrib_val = nullptr;
@@ -300,7 +295,6 @@ struct ES_Dataflows {
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
 	                                     vector<LogicalType> &return_types, vector<string> &names) {
-
 		std::vector<string> providers;
 		std::vector<string> dataflows;
 		string language = "en";
@@ -417,7 +411,6 @@ struct ES_Dataflows {
 	};
 
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-
 		const auto &bind_data = input.bind_data->Cast<BindData>();
 		const auto &providers = bind_data.providers;
 		const auto &dataflows = bind_data.dataflows;
@@ -519,7 +512,6 @@ struct ES_Dataflows {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Execute(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
-
 		auto &gstate = input.global_state->Cast<State>();
 
 		// Calculate how many record we can fit in the output
@@ -659,7 +651,6 @@ struct ES_Dataflows {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "table");
@@ -696,7 +687,6 @@ static constexpr const char *ES_VALUES_PATH =
 static constexpr const char *ES_ERROR_PATH = "/S:Fault/faultstring";
 
 struct ES_DataStructure {
-
 	//! Information of a Dimension of an EUROSTAT Dataflow
 	struct Dimension {
 		int32_t position = -1;
@@ -709,7 +699,6 @@ struct ES_DataStructure {
 	//! Returns the basic data structure of an EUROSTAT Dataflow.
 	static std::vector<Dimension> GetBasicDataSchema(ClientContext &context, const string &provider_id,
 	                                                 const string &dataflow_id, const string &language) {
-
 		std::vector<Dimension> dimensions;
 
 		// Execute HTTP GET request
@@ -738,9 +727,7 @@ struct ES_DataStructure {
 		xmlXPathObjectPtr xpath_obj = nullptr;
 
 		for (const auto &xpath : {ES_DIMENSION_PATH, ES_TIME_DIMENSION_PATH}) {
-
 			if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST xpath, xpath_ctx)) && xpath_obj->nodesetval) {
-
 				for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 					xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
 
@@ -790,7 +777,6 @@ struct ES_DataStructure {
 		// Get the Concept names for Dimensions
 
 		if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_CONCEPT_PATH, xpath_ctx)) && xpath_obj->nodesetval) {
-
 			for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 				xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
 
@@ -798,9 +784,7 @@ struct ES_DataStructure {
 				if (!concept_id.empty()) {
 					for (auto &dim : dimensions) {
 						if (dim.concept_id == concept_id) {
-
 							for (xmlNodePtr child = node->children; child; child = child->next) {
-
 								if (strcmp((const char *)child->name, "Name") == 0) {
 									string lang = XmlUtils::GetNodeAttributeValue(child, "lang", language);
 
@@ -826,7 +810,6 @@ struct ES_DataStructure {
 	//! Returns the data structure of an EUROSTAT Dataflow.
 	static std::vector<Dimension> GetDataSchema(ClientContext &context, const string &provider_id,
 	                                            const string &dataflow_id, const string &language) {
-
 		auto dimensions = ES_DataStructure::GetBasicDataSchema(context, provider_id, dataflow_id, language);
 
 		// Execute HTTP GET request
@@ -853,7 +836,6 @@ struct ES_DataStructure {
 		xmlXPathObjectPtr xpath_obj = nullptr;
 
 		if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_VALUES_PATH, xpath_ctx)) && xpath_obj->nodesetval) {
-
 			for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 				xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
 
@@ -863,7 +845,6 @@ struct ES_DataStructure {
 
 					for (auto &dim : dimensions) {
 						if (dim.id == dim_id) {
-
 							for (xmlNodePtr child = node->children; child; child = child->next) {
 								if (strcmp((const char *)child->name, "Value") == 0) {
 									string code_value = XmlUtils::GetNodeTextContent(child);
@@ -900,7 +881,6 @@ struct ES_DataStructure {
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
 	                                     vector<LogicalType> &return_types, vector<string> &names) {
-
 		D_ASSERT(input.inputs.size() == 2);
 
 		const string provider_id = StringValue::Get(input.inputs[0]);
@@ -975,7 +955,6 @@ struct ES_DataStructure {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static unique_ptr<NodeStatistics> Cardinality(ClientContext &context, const FunctionData *data) {
-
 		auto &bind_data = data->Cast<BindData>();
 		auto result = make_uniq<NodeStatistics>();
 
@@ -991,7 +970,6 @@ struct ES_DataStructure {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Execute(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
-
 		auto &bind_data = input.bind_data->Cast<BindData>();
 		auto &gstate = input.global_state->Cast<State>();
 
@@ -1086,7 +1064,6 @@ struct ES_DataStructure {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "table");
@@ -1109,7 +1086,6 @@ struct ES_DataStructure {
 //! Returns the data structure (dimensions) of a given dataflow
 std::vector<eurostat::Dimension> EurostatUtils::DataStructureOf(ClientContext &context, const std::string &provider_id,
                                                                 const std::string &dataflow_id) {
-
 	auto dimensions = ES_DataStructure::GetBasicDataSchema(context, provider_id, dataflow_id, "en");
 	std::vector<eurostat::Dimension> data_structure;
 
@@ -1122,7 +1098,6 @@ std::vector<eurostat::Dimension> EurostatUtils::DataStructureOf(ClientContext &c
 
 //! Extracts the error message of a given Eurostat API response body
 std::string EurostatUtils::GetXmlErrorMessage(const std::string &response_body) {
-
 	XmlDocument document = XmlDocument(response_body);
 	xmlXPathContextPtr xpath_ctx = document.GetXPathContext();
 	xmlXPathObjectPtr xpath_obj = nullptr;
@@ -1131,7 +1106,6 @@ std::string EurostatUtils::GetXmlErrorMessage(const std::string &response_body) 
 
 	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_ERROR_PATH, xpath_ctx)) && xpath_obj->nodesetval &&
 	    xpath_obj->nodesetval->nodeNr > 0) {
-
 		xmlNodePtr node = xpath_obj->nodesetval->nodeTab[0];
 		error_msg = XmlUtils::GetNodeTextContent(node);
 	}
@@ -1144,7 +1118,6 @@ std::string EurostatUtils::GetXmlErrorMessage(const std::string &response_body) 
 }
 
 void EurostatInfoFunctions::Register(ExtensionLoader &loader) {
-
 	ES_Endpoints::Register(loader);
 	ES_Dataflows::Register(loader);
 	ES_DataStructure::Register(loader);

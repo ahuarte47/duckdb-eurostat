@@ -17,7 +17,7 @@ if(EMSCRIPTEN)
   # needed, but somehow some global symbols are not properly
   # exported otherwise this solves by basically re-linking (at the moment the
   # Wasm binary is actually produced)
-  set(DUCKDB_EXTENSION_SPATIAL_LINKED_LIBS
+  set(DUCKDB_EXTENSION_EUROSTAT_LINKED_LIBS
       "../../vcpkg_installed/wasm32-emscripten/lib/lib*.a")
 endif()
 

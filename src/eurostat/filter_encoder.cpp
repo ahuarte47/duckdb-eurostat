@@ -40,7 +40,6 @@ static std::string VIRTUAL_DIMENSION_FLAG = "---";
 static std::string TIME_PERIOD_DIMENSION_NAME = "time_period";
 
 EurostatFilter::EurostatFilter(const std::vector<eurostat::Dimension> &ds) : data_structure(ds) {
-
 	for (const auto &dim : data_structure) {
 		if (dim.position == -1 || dim.name == TIME_PERIOD_DIMENSION_NAME) {
 			dim_mask.push_back(VIRTUAL_DIMENSION_FLAG);
@@ -51,7 +50,6 @@ EurostatFilter::EurostatFilter(const std::vector<eurostat::Dimension> &ds) : dat
 }
 
 bool EurostatFilter::IsEmpty() const {
-
 	if (!start_period.empty() || !end_period.empty()) {
 		return false;
 	}
@@ -103,7 +101,6 @@ std::string EurostatFilter::GetFilterString() const {
 }
 
 void EurostatFilterSet::PushEmptyFilter() {
-
 	EurostatFilter new_filter(data_structure);
 	filters.emplace_back(std::move(new_filter));
 }
@@ -124,9 +121,7 @@ bool FilterEncoder::GetComparisonOperator(ExpressionType type, std::string &out_
 
 bool FilterEncoder::EncodeFilter(const TableFilter &filter, const eurostat::Dimension &dimension,
                                  const idx_t &dim_index, EurostatFilterSet &out_result) {
-
 	switch (filter.filter_type) {
-
 	case TableFilterType::CONSTANT_COMPARISON:
 		return EncodeConstantComparison(filter.Cast<ConstantFilter>(), dimension, dim_index, out_result);
 
@@ -155,7 +150,6 @@ bool FilterEncoder::EncodeFilter(const TableFilter &filter, const eurostat::Dime
 
 bool FilterEncoder::EncodeConstantComparison(const ConstantFilter &filter, const eurostat::Dimension &dimension,
                                              const idx_t &dim_index, EurostatFilterSet &out_result) {
-
 	if (filter.constant.IsNull()) {
 		out_result.supported = false;
 		return false;
@@ -164,7 +158,6 @@ bool FilterEncoder::EncodeConstantComparison(const ConstantFilter &filter, const
 	auto &out_filter = out_result.GetCurrentFilter();
 
 	if (dimension.name == TIME_PERIOD_DIMENSION_NAME) {
-
 		if (filter.comparison_type == ExpressionType::COMPARE_GREATERTHANOREQUALTO) {
 			out_filter.start_period = "startPeriod=" + filter.constant.ToString();
 			return true;
@@ -198,7 +191,6 @@ bool FilterEncoder::EncodeConstantComparison(const ConstantFilter &filter, const
 
 bool FilterEncoder::EncodeInFilter(const InFilter &filter, const eurostat::Dimension &dimension, const idx_t &dim_index,
                                    EurostatFilterSet &out_result) {
-
 	if (dimension.name == TIME_PERIOD_DIMENSION_NAME && filter.values.size() > 1) {
 		// Eurostat API does not support multiple time period values.
 		out_result.supported = false;
@@ -217,7 +209,6 @@ bool FilterEncoder::EncodeInFilter(const InFilter &filter, const eurostat::Dimen
 
 bool FilterEncoder::EncodeConjunctionAnd(const ConjunctionAndFilter &filter, const eurostat::Dimension &dimension,
                                          const idx_t &dim_index, EurostatFilterSet &out_result) {
-
 	// Something's wrong if there are no child filters.
 	if (filter.child_filters.empty()) {
 		out_result.supported = false;
@@ -235,7 +226,6 @@ bool FilterEncoder::EncodeConjunctionAnd(const ConjunctionAndFilter &filter, con
 
 bool FilterEncoder::EncodeConjunctionOr(const ConjunctionOrFilter &filter, const eurostat::Dimension &dimension,
                                         const idx_t &dim_index, EurostatFilterSet &out_result) {
-
 	// Something's wrong if there are no child filters.
 	if (filter.child_filters.empty()) {
 		out_result.supported = false;
@@ -255,7 +245,6 @@ bool FilterEncoder::EncodeConjunctionOr(const ConjunctionOrFilter &filter, const
 FilterEncoderResult FilterEncoder::Encode(const TableFilterSet *filters,
                                           const std::vector<eurostat::Dimension> &data_structure,
                                           const std::vector<column_t> &column_ids) {
-
 	FilterEncoderResult result;
 	result.supported = true;
 
@@ -319,7 +308,6 @@ FilterEncoderResult FilterEncoder::Encode(const TableFilterSet *filters,
 
 	if (result.supported) {
 		for (const auto &out_filter : filter_set.filters) {
-
 			if (!out_filter.IsEmpty()) {
 				std::string filter_clause = out_filter.GetFilterString();
 				result.filters.emplace_back(filter_clause);
@@ -337,7 +325,6 @@ FilterEncoderResult FilterEncoder::Encode(const TableFilterSet *filters,
 FilterEncoderResult FilterEncoder::EncodeExpression(vector<unique_ptr<Expression>> &expressions,
                                                     const std::vector<eurostat::Dimension> &data_structure,
                                                     const std::vector<column_t> &column_ids) {
-
 	FilterEncoderResult result;
 	result.supported = true;
 
@@ -362,7 +349,6 @@ FilterEncoderResult FilterEncoder::EncodeExpression(vector<unique_ptr<Expression
 
 	if (result.supported) {
 		for (const auto &out_filter : filter_set.filters) {
-
 			if (!out_filter.IsEmpty()) {
 				std::string filter_clause = out_filter.GetFilterString();
 				result.filters.emplace_back(filter_clause);
@@ -382,7 +368,6 @@ FilterEncoderResult FilterEncoder::EncodeExpression(vector<unique_ptr<Expression
 int FilterEncoder::GetDimensionIndexFromColumnRef(const Expression &expr,
                                                   const std::vector<eurostat::Dimension> &data_structure,
                                                   const std::vector<column_t> &column_ids) {
-
 	if (expr.GetExpressionClass() != ExpressionClass::BOUND_COLUMN_REF) {
 		return -1;
 	}
@@ -401,18 +386,14 @@ int FilterEncoder::GetDimensionIndexFromColumnRef(const Expression &expr,
 
 bool FilterEncoder::EncodeExpressionNode(const Expression &expr, const std::vector<eurostat::Dimension> &data_structure,
                                          const std::vector<column_t> &column_ids, EurostatFilterSet &out_result) {
-
 	switch (expr.GetExpressionClass()) {
-
 	case ExpressionClass::BOUND_COMPARISON: {
-
 		const auto &op = expr.Cast<BoundComparisonExpression>();
 
 		// Handle column = constant comparisons.
 
 		if (op.left->GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF &&
 		    op.right->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
-
 			int dim_idx = GetDimensionIndexFromColumnRef(*op.left, data_structure, column_ids);
 			if (dim_idx != -1) {
 				const auto &dimension = data_structure[dim_idx];
@@ -428,7 +409,6 @@ bool FilterEncoder::EncodeExpressionNode(const Expression &expr, const std::vect
 		return false;
 	}
 	case ExpressionClass::BOUND_OPERATOR: {
-
 		const auto &op = expr.Cast<BoundOperatorExpression>();
 
 		// Handle column IN (values) comparisons.
@@ -453,7 +433,6 @@ bool FilterEncoder::EncodeExpressionNode(const Expression &expr, const std::vect
 			vector<Value> values;
 
 			for (idx_t child = 1; child < op.children.size(); child++) {
-
 				if (op.children[child]->GetExpressionClass() != ExpressionClass::BOUND_CONSTANT) {
 					out_result.supported = false;
 					return false;
@@ -473,11 +452,9 @@ bool FilterEncoder::EncodeExpressionNode(const Expression &expr, const std::vect
 		return false;
 	}
 	case ExpressionClass::BOUND_CONJUNCTION: {
-
 		const auto &conjunction = expr.Cast<BoundConjunctionExpression>();
 
 		if (conjunction.type == ExpressionType::CONJUNCTION_AND) {
-
 			// For AND, all children must be supported.
 			for (const auto &child : conjunction.children) {
 				if (!EncodeExpressionNode(*child, data_structure, column_ids, out_result)) {
@@ -488,10 +465,8 @@ bool FilterEncoder::EncodeExpressionNode(const Expression &expr, const std::vect
 			return true;
 		}
 		if (conjunction.type == ExpressionType::CONJUNCTION_OR) {
-
 			// For OR, create separate dimension filter for each child.
 			for (const auto &child : conjunction.children) {
-
 				if (!EncodeExpressionNode(*child, data_structure, column_ids, out_result)) {
 					out_result.supported = false;
 					return false;
@@ -505,7 +480,6 @@ bool FilterEncoder::EncodeExpressionNode(const Expression &expr, const std::vect
 		return false;
 	}
 	case ExpressionClass::BOUND_BETWEEN: {
-
 		auto &op = expr.Cast<BoundBetweenExpression>();
 
 		// Handle column BETWEEN constant AND constant comparisons.
@@ -519,12 +493,10 @@ bool FilterEncoder::EncodeExpressionNode(const Expression &expr, const std::vect
 
 		int dim_idx = GetDimensionIndexFromColumnRef(*op.input, data_structure, column_ids);
 		if (dim_idx != -1) {
-
 			const auto &dimension = data_structure[dim_idx];
 
 			// Only supported for "timePeriod", the lower bound as startPeriod and upper bound as endPeriod.
 			if (dimension.name == TIME_PERIOD_DIMENSION_NAME) {
-
 				const auto &lower_const = op.lower->Cast<BoundConstantExpression>();
 				const auto &upper_const = op.upper->Cast<BoundConstantExpression>();
 

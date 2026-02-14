@@ -40,7 +40,6 @@ struct HttpResponseData {
 
 //! Represents an HTTP request
 struct HttpRequest {
-
 	// Extract HTTP settings from context
 	static HttpSettings ExtractHttpSettings(ClientContext &context, const string &url);
 
