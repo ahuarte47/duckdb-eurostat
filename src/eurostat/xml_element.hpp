@@ -54,7 +54,6 @@ private:
 
 //! Utility functions for XML processing
 struct XmlUtils {
-
 	//! Initialize libxml2 (call once at extension load)
 	static void Initialize();
 	//! Cleanup libxml2 (optional, for clean shutdown)

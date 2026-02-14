@@ -11,7 +11,6 @@ namespace duckdb {
  * Result of encoding a single T-SQL expression or filter to an Eurostat filter.
  */
 struct EurostatFilter {
-
 	//! Reference to a data structure of dimensions.
 	const std::vector<eurostat::Dimension> &data_structure;
 
@@ -36,7 +35,6 @@ struct EurostatFilter {
  * Result of encoding an entire T-SQL filter to a set of Eurostat filter clauses.
  */
 struct EurostatFilterSet {
-
 	//! Reference to a data structure of dimensions.
 	const std::vector<eurostat::Dimension> &data_structure;
 

@@ -45,7 +45,6 @@ namespace {
 //======================================================================================================================
 
 struct ES_Read {
-
 	//------------------------------------------------------------------------------------------------------------------
 	// Bind
 	//------------------------------------------------------------------------------------------------------------------
@@ -64,7 +63,6 @@ struct ES_Read {
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
 	                                     vector<LogicalType> &return_types, vector<string> &names) {
-
 		D_ASSERT(input.inputs.size() == 2);
 
 		const string &provider_id = StringValue::Get(input.inputs[0]);
@@ -127,7 +125,6 @@ struct ES_Read {
 	//! Parse a data row from a TSV line.
 	static bool ParseDatarow(State &data_table, const std::vector<string> &time_periods, int32_t geo_column_index,
 	                         const string &line, std::unordered_map<string, bool> &row_keys, const bool &check_keys) {
-
 		std::vector<bool> state_keys;
 
 		// Split line by tabs.
@@ -182,7 +179,6 @@ struct ES_Read {
 		// Parse observation values for each time period.
 
 		for (size_t i = 0; i < time_periods.size(); i++) {
-
 			// Duplicate row, skip.
 
 			if (check_keys && state_keys[i]) {
@@ -214,7 +210,6 @@ struct ES_Read {
 	static std::vector<string> GetDataUrls(ClientContext &context, TableFunctionInitInput &input,
 	                                       const std::vector<eurostat::Dimension> &data_structure,
 	                                       const string &base_url, const BindData &bind_data) {
-
 		std::unordered_map<string, bool> urls;
 
 		// Use complex filters previously parsed in 'PushdownComplexFilter' function.
@@ -246,7 +241,6 @@ struct ES_Read {
 	}
 
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-
 		auto &bind_data = input.bind_data->Cast<BindData>();
 		auto global_state = make_uniq_base<GlobalTableFunctionState, State>();
 		auto &data_table = global_state->Cast<State>();
@@ -268,7 +262,6 @@ struct ES_Read {
 		bool check_keys = data_urls.size() > 1;
 
 		for (const auto &data_url : data_urls) {
-
 			EUROSTAT_SCAN_DEBUG_LOG(1, "Fetching data from URL: %s", data_url.c_str());
 
 			// Execute HTTP GET request.
@@ -311,7 +304,6 @@ struct ES_Read {
 
 			while (std::getline(line_stream, line)) {
 				if (!line.empty()) {
-
 					// Parse header line to...
 					if (line_index == 0) {
 						size_t pos = line.find("\\TIME_PERIOD");
@@ -368,7 +360,6 @@ struct ES_Read {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Execute(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
-
 		auto &gstate = input.global_state->Cast<State>();
 
 		// Calculate how many record we can fit in the output
@@ -382,7 +373,6 @@ struct ES_Read {
 
 		// Load current subset of rows.
 		for (idx_t row_idx = 0, record_idx = current_row; row_idx < output_size; row_idx++, record_idx++) {
-
 			const auto &datarow = gstate.rows[record_idx];
 			const DimensionValues &dim_values = gstate.dimensions[datarow.dimension_index];
 			const auto &dim_count = dim_values.values.size();
@@ -439,7 +429,6 @@ struct ES_Read {
 
 	static void PushdownComplexFilter(ClientContext &context, LogicalGet &get, FunctionData *bind_data_p,
 	                                  vector<unique_ptr<Expression>> &expressions) {
-
 		auto &bind_data = bind_data_p->Cast<BindData>();
 
 		// Get column_ids from LogicalGet to map expression column indices to table columns.
@@ -473,7 +462,6 @@ struct ES_Read {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "table");
@@ -499,7 +487,6 @@ struct ES_Read {
 // #####################################################################################################################
 
 void EurostatDataFunctions::Register(ExtensionLoader &loader) {
-
 	ES_Read::Register(loader);
 }
 

@@ -18,7 +18,6 @@ namespace {
 //======================================================================================================================
 
 struct ES_GeoLevel {
-
 	//! Returns the level for a GEO code in the NUTS classification or if it is considered aggregates.
 	inline static void GetGeoLevelFromGeoCode(DataChunk &args, ExpressionState &state, Vector &result) {
 		D_ASSERT(args.data.size() == 1);
@@ -52,7 +51,6 @@ struct ES_GeoLevel {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "scalar");
@@ -71,7 +69,6 @@ struct ES_GeoLevel {
 // #####################################################################################################################
 
 void EurostatScalarFunctions::Register(ExtensionLoader &loader) {
-
 	ES_GeoLevel::Register(loader);
 }
 
