@@ -23,7 +23,9 @@ endif()
 
 project(${TARGET_NAME})
 include_directories(src/include)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/httplib)
+if(NOT EMSCRIPTEN)
+  include_directories(${CMAKE_SOURCE_DIR}/third_party/httplib)
+endif()
 
 set(EXTENSION_SOURCES src/eurostat_extension.cpp)
 add_subdirectory(src/eurostat)
