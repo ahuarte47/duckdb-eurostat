@@ -232,10 +232,87 @@ HttpSettings HttpRequest::ExtractHttpSettings(ClientContext &context, const stri
 	return settings;
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+// Execute HTTP request using synchronous XHR (works in Web Worker context where duckdb-wasm always runs).
+// Uses arraybuffer to safely receive binary/compressed responses, then applies C++ decompression.
+HttpResponseData HttpRequest::ExecuteHttpRequest(const HttpSettings &settings, const string &url, const string &method,
+                                                 const HttpHeaders &headers, const string &request_body,
+                                                 const string &content_type) {
+	HttpResponseData result;
+	result.status_code = 0;
+	result.content_length = -1;
+
+	try {
+		int32_t status_code = 0;
+		int32_t body_len = 0;
+
+		// Use arraybuffer to get raw bytes (safe for compressed/binary responses)
+		char *body_ptr = (char *)EM_ASM_PTR(
+		    {
+			    try {
+				    var url = UTF8ToString($0);
+				    var method = UTF8ToString($1);
+				    var xhr = new XMLHttpRequest();
+				    xhr.open(method, url, false); // false = synchronous
+				    xhr.responseType = 'arraybuffer';
+				    xhr.send(null);
+				    HEAP32[$2 >> 2] = xhr.status;
+				    if (xhr.response && xhr.response.byteLength > 0) {
+					    var bytes = new Uint8Array(xhr.response);
+					    var len = bytes.length;
+					    HEAP32[$3 >> 2] = len;
+					    var ptr = _malloc(len + 1);
+					    HEAPU8.set(bytes, ptr);
+					    HEAPU8[ptr + len] = 0;
+					    return ptr;
+				    }
+				    HEAP32[$3 >> 2] = 0;
+				    return 0;
+			    } catch (e) {
+				    HEAP32[$2 >> 2] = 0;
+				    HEAP32[$3 >> 2] = 0;
+				    return 0;
+			    }
+		    },
+		    url.c_str(), method.c_str(), &status_code, &body_len);
+
+		result.status_code = status_code;
+		if (result.status_code == 0) {
+			result.error = "HTTP request failed (XHR error)";
+		}
+		if (body_ptr && body_len > 0) {
+			string raw_body(body_ptr, static_cast<size_t>(body_len));
+			free(body_ptr);
+			// Auto-decompress (same logic as native path)
+			try {
+				if (GZipFileSystem::CheckIsZip(raw_body.data(), raw_body.size())) {
+					result.body = GZipFileSystem::UncompressGZIPString(raw_body);
+				} else if (CheckIsZstd(raw_body.data(), raw_body.size())) {
+					result.body = DecompressZstd(raw_body);
+				} else {
+					result.body = std::move(raw_body);
+				}
+			} catch (...) {
+				result.body = std::move(raw_body);
+			}
+		} else if (body_ptr) {
+			free(body_ptr);
+		}
+	} catch (std::exception &e) {
+		result.error = e.what();
+	}
+
+	return result;
+}
+
+#else
+
 // Execute HTTP request with given settings
 HttpResponseData HttpRequest::ExecuteHttpRequest(const HttpSettings &settings, const string &url, const string &method,
-                                                 const duckdb_httplib_openssl::Headers &headers,
-                                                 const string &request_body, const string &content_type) {
+                                                 const HttpHeaders &headers, const string &request_body,
+                                                 const string &content_type) {
 	HttpResponseData result;
 	result.status_code = 0;
 	result.content_length = -1;
@@ -266,7 +343,10 @@ HttpResponseData HttpRequest::ExecuteHttpRequest(const HttpSettings &settings, c
 			}
 		}
 
-		duckdb_httplib_openssl::Headers req_headers = headers;
+		duckdb_httplib_openssl::Headers req_headers;
+		for (auto &h : headers) {
+			req_headers.insert({h.first, h.second});
+		}
 		if (req_headers.find("User-Agent") == req_headers.end()) {
 			req_headers.insert({"User-Agent", settings.user_agent});
 		}
@@ -343,5 +423,7 @@ HttpResponseData HttpRequest::ExecuteHttpRequest(const HttpSettings &settings, c
 
 	return result;
 }
+
+#endif // __EMSCRIPTEN__
 
 } // namespace duckdb

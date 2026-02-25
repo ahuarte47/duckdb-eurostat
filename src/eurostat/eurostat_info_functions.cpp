@@ -444,8 +444,7 @@ struct ES_Dataflows {
 
 				// Execute HTTP GET request
 
-				auto response =
-				    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
+				auto response = HttpRequest::ExecuteHttpRequest(settings, url, "GET", HttpHeaders(), "", "");
 
 				if (response.status_code != 200) {
 					throw IOException(
@@ -708,8 +707,7 @@ struct ES_DataStructure {
 		             "/latest?detail=referencepartial&references=descendants";
 
 		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
-		auto response =
-		    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
+		auto response = HttpRequest::ExecuteHttpRequest(settings, url, "GET", HttpHeaders(), "", "");
 
 		if (response.status_code != 200) {
 			throw IOException("EUROSTAT: Failed to fetch dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
@@ -818,8 +816,7 @@ struct ES_DataStructure {
 		string url = it->second.api_url + "contentconstraint/" + provider_id + "/" + dataflow_id;
 
 		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
-		auto response =
-		    HttpRequest::ExecuteHttpRequest(settings, url, "GET", duckdb_httplib_openssl::Headers(), "", "");
+		auto response = HttpRequest::ExecuteHttpRequest(settings, url, "GET", HttpHeaders(), "", "");
 
 		if (response.status_code != 200) {
 			throw IOException("EUROSTAT: Failed to fetch dataflow metadata from provider='%s', dataflow='%s': (%d) %s",
