@@ -12,7 +12,10 @@
 #include "duckdb/function/table_function.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/common/operator/cast_operators.hpp"
+#include "duckdb/optimizer/optimizer_extension.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
+#include "duckdb/planner/operator/logical_limit.hpp"
+#include "duckdb/planner/operator/logical_order.hpp"
 
 // EUROSTAT
 #include "eurostat.hpp"
@@ -54,6 +57,7 @@ struct ES_Read {
 		string dataflow_id;
 		std::vector<eurostat::Dimension> data_structure;
 		std::vector<string> complex_filters;
+		std::size_t limit = 0;
 
 		explicit BindData(const string &provider_id, const string &dataflow_id,
 		                  const std::vector<eurostat::Dimension> &data_structure)
@@ -124,7 +128,8 @@ struct ES_Read {
 
 	//! Parse a data row from a TSV line.
 	static bool ParseDatarow(State &data_table, const std::vector<string> &time_periods, int32_t geo_column_index,
-	                         const string &line, std::unordered_map<string, bool> &row_keys, const bool &check_keys) {
+	                         const string &line, std::unordered_map<string, bool> &row_keys, const bool &check_keys,
+	                         const std::size_t &row_limit) {
 		std::vector<bool> state_keys;
 
 		// Split line by tabs.
@@ -200,6 +205,12 @@ struct ES_Read {
 					datarow.observation_value = value;
 
 					data_table.rows.emplace_back(datarow);
+
+					// Do we can stop parsing more rows?
+					if (row_limit > 0 && data_table.rows.size() >= row_limit) {
+						EUROSTAT_SCAN_DEBUG_LOG(1, "LIMIT pushdown %li reached, stopping parsing!", row_limit);
+						return true;
+					}
 				}
 			}
 		}
@@ -248,6 +259,7 @@ struct ES_Read {
 		std::copy(input.column_ids.begin(), input.column_ids.end(), std::back_inserter(data_table.column_ids));
 		const string &provider_id = bind_data.provider_id;
 		const string &dataflow_id = bind_data.dataflow_id;
+		const std::size_t &row_limit = bind_data.limit;
 
 		const auto it = eurostat::ENDPOINTS.find(provider_id);
 		string base_url = it->second.api_url + "data/" + dataflow_id;
@@ -262,6 +274,11 @@ struct ES_Read {
 		bool check_keys = data_urls.size() > 1;
 
 		for (const auto &data_url : data_urls) {
+			// Do we can stop parsing more rows?
+			if (row_limit > 0 && data_table.rows.size() >= row_limit) {
+				break;
+			}
+
 			EUROSTAT_SCAN_DEBUG_LOG(1, "Fetching data from URL: %s", data_url.c_str());
 
 			// Execute HTTP GET request.
@@ -302,6 +319,11 @@ struct ES_Read {
 			int32_t geo_column_index = -1;
 
 			while (std::getline(line_stream, line)) {
+				// Do we can stop parsing more rows?
+				if (row_limit > 0 && data_table.rows.size() >= row_limit) {
+					break;
+				}
+
 				if (!line.empty()) {
 					// Parse header line to...
 					if (line_index == 0) {
@@ -341,7 +363,7 @@ struct ES_Read {
 
 					} else {
 						// Add data row.
-						ParseDatarow(data_table, time_periods, geo_column_index, line, row_keys, check_keys);
+						ParseDatarow(data_table, time_periods, geo_column_index, line, row_keys, check_keys, row_limit);
 					}
 					line_index++;
 				}
@@ -352,6 +374,50 @@ struct ES_Read {
 		EUROSTAT_SCAN_DEBUG_LOG(1, "Total rows: %zu", data_table.rows.size());
 
 		return global_state;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Optimize (Only LIMIT pushdown is implemented)
+	//------------------------------------------------------------------------------------------------------------------
+
+	static void Optimize(OptimizerExtensionInput &input, unique_ptr<LogicalOperator> &op) {
+		// Apply optimizations on the LogicalPlan
+
+		if (op->type == LogicalOperatorType::LOGICAL_LIMIT) {
+			auto &limit = op->Cast<LogicalLimit>();
+
+			// Only push down simple LIMIT without OFFSET, ORDER BY or GROUP BY, and with a constant value,
+			// as it would change the result of the query.
+			if (limit.limit_val.Type() != LimitNodeType::CONSTANT_VALUE) {
+				return;
+			}
+			if (limit.offset_val.Type() != LimitNodeType::UNSET) {
+				return;
+			}
+			for (const auto &child : op->children) {
+				if (child->type == LogicalOperatorType::LOGICAL_ORDER_BY) {
+					return;
+				}
+				if (child->type == LogicalOperatorType::LOGICAL_AGGREGATE_AND_GROUP_BY) {
+					return;
+				}
+				if (child->type == LogicalOperatorType::LOGICAL_GET) {
+					auto &get = child->Cast<LogicalGet>();
+
+					if (StringUtil::Lower(get.function.name) == "eurostat_read") {
+						auto &bind_data = get.bind_data->Cast<BindData>();
+						bind_data.limit = limit.limit_val.GetConstantValue();
+						EUROSTAT_SCAN_DEBUG_LOG(1, "LIMIT pushdown: %zu", bind_data.limit);
+						return;
+					}
+				}
+			}
+		}
+
+		// Recurse into children
+		for (auto &child : op->children) {
+			Optimize(input, child);
+		}
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -476,6 +542,13 @@ struct ES_Read {
 		func.pushdown_complex_filter = PushdownComplexFilter;
 
 		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+
+		// Register optimizer extension for LIMIT pushdown
+		auto &db = loader.GetDatabaseInstance();
+		auto &config = DBConfig::GetConfig(db);
+		OptimizerExtension eurostat_optimizer;
+		eurostat_optimizer.optimize_function = ES_Read::Optimize;
+		OptimizerExtension::Register(config, std::move(eurostat_optimizer));
 	}
 };
 
