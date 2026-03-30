@@ -381,6 +381,9 @@ int FilterEncoder::GetDimensionIndexFromColumnRef(const Expression &expr,
 	}
 
 	column_t dim_index = column_ids[binding_index];
+	if (dim_index >= data_structure.size()) {
+		return -1;
+	}
 	return dim_index;
 }
 
