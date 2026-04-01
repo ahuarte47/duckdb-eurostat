@@ -1,6 +1,11 @@
 Release history
 ---------------
 
+0.2.1
+++++++++++++++++++
+
+- Fix filter pushdown in `EUROSTAT_Read` table function.
+
 0.2.0
 ++++++++++++++++++
 
