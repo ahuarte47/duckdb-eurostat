@@ -40,7 +40,8 @@ This is the list of available functions:
 
     ```sql
 	SELECT provider_id, organization, description FROM EUROSTAT_Endpoints();
-
+	```
+	```sql
 	┌─────────────┬──────────────┬──────────────────────────────────────────────────────┐
 	│ provider_id │ organization │                     description                      │
 	│   varchar   │   varchar    │                       varchar                        │
@@ -74,7 +75,8 @@ This is the list of available functions:
 	FROM
 		EUROSTAT_Dataflows(providers = ['ESTAT'], dataflows = ['DEMO_R_D2JAN'], language := 'de')
 	;
-
+	```
+	```sql
 	┌─────────────┬──────────────┬─────────┬─────────┬───────────────────────────────────────────────────────────────────┐
 	│ provider_id │  dataflow_id │  class  │ version │                               label                               │
 	│   varchar   │   varchar    │ varchar │ varchar │                              varchar                              │
@@ -97,7 +99,8 @@ This is the list of available functions:
 	FROM
 		EUROSTAT_DataStructure('ESTAT', 'DEMO_R_D2JAN', language := 'en')
 	;
-
+	```
+	```sql
 	┌─────────────┬──────────────┬──────────┬─────────────┬─────────────────────────────────┐
 	│ provider_id │ dataflow_id  │ position │  dimension  │             concept             │
 	│   varchar   │   varchar    │  int32   │   varchar   │             varchar             │
@@ -122,7 +125,8 @@ This is the list of available functions:
 
     ```sql
 	SELECT * FROM EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN') LIMIT 5;
-
+	```
+	```sql
 	┌─────────┬─────────┬─────────┬─────────┬─────────┬───────────┬─────────────┬───────────────────┐
 	│  freq   │  unit   │   sex   │   age   │   geo   │ geo_level │ TIME_PERIOD │ observation_value │
 	│ varchar │ varchar │ varchar │ varchar │ varchar │  varchar  │   varchar   │      double       │
