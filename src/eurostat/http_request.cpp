@@ -208,7 +208,14 @@ HttpSettings HttpRequest::ExtractHttpSettings(ClientContext &context, const stri
 	FileOpener::TryGetCurrentSetting(&opener, "http_request_cache", settings.use_cache, &info);
 	FileOpener::TryGetCurrentSetting(&opener, "http_follow_redirects", settings.follow_redirects, &info);
 
-	settings.proxy = Settings::Get<HTTPProxySetting>(context);
+	auto &http_proxy_setting = db.config.options.http_proxy;
+	if (!http_proxy_setting.empty()) {
+		idx_t port;
+		string host;
+		HTTPUtil::ParseHTTPProxyHost(http_proxy_setting, host, port);
+		settings.proxy = host;
+		settings.proxy_port = port;
+	}
 	settings.proxy_username = Settings::Get<HTTPProxyUsernameSetting>(context);
 	settings.proxy_password = Settings::Get<HTTPProxyPasswordSetting>(context);
 
@@ -217,8 +224,14 @@ HttpSettings HttpRequest::ExtractHttpSettings(ClientContext &context, const stri
 	if (secret_reader.TryGetSecretKey<string>("http_proxy", proxy_from_secret) && !proxy_from_secret.empty()) {
 		settings.proxy = proxy_from_secret;
 	}
-	secret_reader.TryGetSecretKey<string>("http_proxy_username", settings.proxy_username);
-	secret_reader.TryGetSecretKey<string>("http_proxy_password", settings.proxy_password);
+	string proxy_username;
+	if (secret_reader.TryGetSecretKey<string>("http_proxy_username", proxy_username) && !proxy_username.empty()) {
+		settings.proxy_username = proxy_username;
+	}
+	string proxy_password;
+	if (secret_reader.TryGetSecretKey<string>("http_proxy_password", proxy_password) && !proxy_password.empty()) {
+		settings.proxy_password = proxy_password;
+	}
 
 	// Check for custom user agent setting, otherwise use default
 	string custom_user_agent;
@@ -334,7 +347,7 @@ HttpResponseData HttpRequest::ExecuteHttpRequest(const HttpSettings &settings, c
 
 		if (!settings.proxy.empty()) {
 			string proxy_host;
-			idx_t proxy_port = 80;
+			idx_t proxy_port = settings.proxy_port > 0 ? settings.proxy_port : 80;
 			string proxy_copy = settings.proxy;
 			HTTPUtil::ParseHTTPProxyHost(proxy_copy, proxy_host, proxy_port);
 			client.set_proxy(proxy_host, static_cast<int>(proxy_port));

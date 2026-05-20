@@ -20,6 +20,7 @@ struct HttpSettings {
 	uint64_t timeout;
 	bool keep_alive;
 	string proxy;
+	idx_t proxy_port = 80;
 	string proxy_username;
 	string proxy_password;
 	string user_agent;
