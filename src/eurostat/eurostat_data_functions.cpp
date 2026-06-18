@@ -294,11 +294,18 @@ struct ES_Read {
 			if (response.content_type == "application/xml") {
 				std::string error_msg = EurostatUtils::GetXmlErrorMessage(response.body);
 
-				EUROSTAT_SCAN_DEBUG_LOG(1, "Failed to fetch a dataset from provider='%s', dataflow='%s': %s",
-				                        provider_id.c_str(), dataflow_id.c_str(), error_msg.c_str());
+				EUROSTAT_SCAN_DEBUG_LOG(1, "Failed to fetch a dataset from provider='%s', dataflow='%s': (%d) %s",
+				                        provider_id.c_str(), dataflow_id.c_str(), response.status_code,
+				                        error_msg.c_str());
 
-				data_table.rows.clear();
-				return global_state;
+				if (response.status_code == 200) {
+					data_table.rows.clear();
+					return global_state;
+				} else {
+					throw IOException("EUROSTAT: Failed to fetch a dataset from provider='%s', dataflow='%s': (%d) %s",
+					                  provider_id.c_str(), dataflow_id.c_str(), response.status_code,
+					                  error_msg.c_str());
+				}
 			}
 			if (response.status_code != 200) {
 				throw IOException("EUROSTAT: Failed to fetch a dataset from provider='%s', dataflow='%s': (%d) %s",
