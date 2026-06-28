@@ -14,6 +14,7 @@ ORDER BY
     provider_id
 ;
 ----
+COMEXT	https://ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1/
 ECFIN	https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1/
 EMPL	https://webgate.ec.europa.eu/empl/redisstat/api/dissemination/sdmx/2.1/
 ESTAT	https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/

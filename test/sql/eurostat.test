@@ -15,4 +15,4 @@ require eurostat
 query I
 SELECT count(*) FROM EUROSTAT_Endpoints()
 ----
-5
+6

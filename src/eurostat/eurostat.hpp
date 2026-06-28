@@ -12,23 +12,27 @@ struct Endpoint {
 	std::string organization; // (aka agency)
 	std::string description;
 	std::string api_url;
+	std::string source_id;
 };
 
 //! API Endpoints
 static const std::unordered_map<std::string, Endpoint> ENDPOINTS = {
-    {"ESTAT", {"EUROSTAT", "EUROSTAT database", "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/"}},
+    {"COMEXT",
+     {"EUROSTAT", "Comext reference database", "https://ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1/",
+      "ESTAT"}},
+    {"ESTAT", {"EUROSTAT", "EUROSTAT database", "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/", "ESTAT"}},
     {"ECFIN",
      {"DG ECFIN", "Economic and Financial Affairs",
-      "https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1/"}},
+      "https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1/", "ECFIN"}},
     {"EMPL",
      {"DG EMPL", "Employment, Social Affairs and Inclusion",
-      "https://webgate.ec.europa.eu/empl/redisstat/api/dissemination/sdmx/2.1/"}},
+      "https://webgate.ec.europa.eu/empl/redisstat/api/dissemination/sdmx/2.1/", "EMPL"}},
     {"GROW",
      {"DG GROW", "Internal Market, Industry, Entrepreneurship and SMEs",
-      "https://webgate.ec.europa.eu/grow/redisstat/api/dissemination/sdmx/2.1/"}},
+      "https://webgate.ec.europa.eu/grow/redisstat/api/dissemination/sdmx/2.1/", "GROW"}},
     {"TAXUD",
      {"DG TAXUD", "Taxation and Customs Union",
-      "https://webgate.ec.europa.eu/taxation_customs/redisstat/api/dissemination/sdmx/2.1/"}},
+      "https://webgate.ec.europa.eu/taxation_customs/redisstat/api/dissemination/sdmx/2.1/", "TAXUD"}},
 };
 
 /**

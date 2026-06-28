@@ -1,6 +1,11 @@
 Release history
 ---------------
 
+0.3.0
+++++++++++++++++++
+
+- Add Comext reference database (https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-getting-started/comext-database).
+
 0.2.1
 ++++++++++++++++++
 

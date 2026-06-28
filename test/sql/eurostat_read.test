@@ -42,3 +42,14 @@ ES	2003	F
 PT	2001	F
 PT	2002	F
 PT	2003	F
+
+query III
+SELECT
+    time_period, product, reporter
+FROM
+    EUROSTAT_Read('COMEXT', 'DS-059341') WHERE time_period = '2006-05' AND product = '0103' AND reporter = 'FR'
+LIMIT 2
+;
+----
+2006-05	0103	FR
+2006-05	0103	FR

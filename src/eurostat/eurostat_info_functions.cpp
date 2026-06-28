@@ -434,7 +434,7 @@ struct ES_Dataflows {
 			const auto it = eurostat::ENDPOINTS.find(provider_id);
 
 			for (const auto &dataflow_id : dataflows) {
-				string url = it->second.api_url + "dataflow/" + provider_id + "/" + dataflow_id +
+				string url = it->second.api_url + "dataflow/" + it->second.source_id + "/" + dataflow_id +
 				             "?format=JSON&compressed=true&lang=" + language;
 
 				if (req_count == 0) {
@@ -703,7 +703,7 @@ struct ES_DataStructure {
 		// Execute HTTP GET request
 
 		const auto it = eurostat::ENDPOINTS.find(provider_id);
-		string url = it->second.api_url + "dataflow/" + provider_id + "/" + dataflow_id +
+		string url = it->second.api_url + "dataflow/" + it->second.source_id + "/" + dataflow_id +
 		             "/latest?detail=referencepartial&references=descendants";
 
 		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
@@ -813,7 +813,7 @@ struct ES_DataStructure {
 		// Execute HTTP GET request
 
 		const auto it = eurostat::ENDPOINTS.find(provider_id);
-		string url = it->second.api_url + "contentconstraint/" + provider_id + "/" + dataflow_id;
+		string url = it->second.api_url + "contentconstraint/" + it->second.source_id + "/" + dataflow_id;
 
 		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
 		auto response = HttpRequest::ExecuteHttpRequest(settings, url, "GET", HttpHeaders(), "", "");
