@@ -35,7 +35,7 @@ static bool CheckIsZstd(const char *data, idx_t size) {
 
 // Decompress Zstd compressed data
 static string DecompressZstd(const string &compressed) {
-	unsigned long long decompressed_size = duckdb_zstd::ZSTD_getFrameContentSize(compressed.data(), compressed.size());
+	uint64_t decompressed_size = duckdb_zstd::ZSTD_getFrameContentSize(compressed.data(), compressed.size());
 
 	if (decompressed_size == ZSTD_CONTENTSIZE_ERROR) {
 		throw IOException("Invalid zstd compressed data");
