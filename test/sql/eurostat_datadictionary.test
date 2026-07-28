@@ -1,0 +1,56 @@
+# name: test/sql/eurostat_datadictionary.test
+# description: test eurostat extension
+# group: [sql]
+
+require eurostat
+
+query II
+SELECT
+    code, value
+FROM
+    EUROSTAT_DataDictionary('crop_pro', language := 'en')
+WHERE
+    code IN ('C1160', 'C1250', 'C2090', 'C2251', 'C9000')
+ORDER BY
+    code
+;
+----
+C1160	Barley
+C1250	Rice
+C2090	Apples
+C2251	Figs
+C9000	Dates
+
+query II
+SELECT
+    code, value
+FROM
+    EUROSTAT_DataDictionary('crop_pro', language := 'de')
+WHERE
+    code IN ('C1160', 'C1250', 'C2090', 'C2251', 'C9000')
+ORDER BY
+    code
+;
+----
+C1160	Gerste
+C1250	Reis
+C2090	Äpfel
+C2251	Feigen
+C9000	Datteln
+
+query II
+SELECT
+    code, value
+FROM
+    EUROSTAT_DataDictionary('crop_pro', language := 'fr')
+WHERE
+    code IN ('C1160', 'C1250', 'C2090', 'C2251', 'C9000')
+ORDER BY
+    code
+;
+----
+C1160	Orge
+C1250	Riz
+C2090	Pommes
+C2251	Figues
+C9000	Dattes

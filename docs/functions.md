@@ -14,6 +14,7 @@
 | [`EUROSTAT_Dataflows`](#eurostat_dataflows) | Returns info of the dataflows provided by EUROSTAT Providers. |
 | [`EUROSTAT_Endpoints`](#eurostat_endpoints) | Returns the list of supported EUROSTAT API Endpoints. |
 | [`EUROSTAT_DataStructure`](#eurostat_datastructure) | Returns information of the data structure of an EUROSTAT Dataflow. |
+| [`EUROSTAT_DataDictionary`](#eurostat_datadictionary) | Returns the dictionary of codes and values of a given coded variable from Eurostat. |
 | [`EUROSTAT_Read`](#eurostat_read) | Returns the dataset of an EUROSTAT Dataflow. |
 
 ----
@@ -182,6 +183,48 @@ FROM
 `geo_level` is a dimension that is not part of the dataflow source, but it is computed based
 on the `geo` dimension values. See the function [EUROSTAT_GetGeoLevelFromGeoCode](#eurostat_getgeolevelfromgeocode) below for
 more details.
+
+----
+
+### EUROSTAT_DataDictionary
+
+#### Signature
+
+```sql
+EUROSTAT_DataDictionary (variable VARCHAR, language VARCHAR = 'en')
+```
+
+#### Description
+
+
+Returns the dictionary of codes and values of a given coded variable from Eurostat.
+
+
+#### Example
+
+```sql
+SELECT
+	code,
+	value
+FROM
+	EUROSTAT_DataDictionary('cities', language := 'en')
+;
+
+┌─────────┬────────────────────────────────────────────┐
+│  code   │                   value                    │
+│ varchar │                  varchar                   │
+├─────────┼────────────────────────────────────────────┤
+│ AL001C  │ Tirana                                     │
+│ AT      │ Austria                                    │
+│ AT001C  │ Wien (greater city)                        │
+│ AT001F  │ Wien                                       │
+│ ·       │    ·                                       │
+│ ·       │    ·                                       │
+│ ·       │    ·                                       │
+│ UK135F  │ Derry & Strabane Local Government District │
+│ XK001C  │ Prishtinë/Priština                         │
+└─────────┴────────────────────────────────────────────┘
+```
 
 ----
 

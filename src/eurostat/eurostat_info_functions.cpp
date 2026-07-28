@@ -1074,6 +1074,218 @@ struct ES_DataStructure {
 	};
 };
 
+//======================================================================================================================
+// ES_DataDictionary
+//======================================================================================================================
+
+struct ES_DataDictionary {
+	//! Dictionary entry of an EUROSTAT coded variable
+	struct DictEntry {
+		string code;
+		string value;
+	};
+
+	//! Returns the dictionary of an EUROSTAT coded variable.
+	static std::vector<DictEntry> GetDictionaryOf(ClientContext &context, const string &variable,
+	                                              const string &language) {
+		std::vector<DictEntry> rows;
+
+		// Execute HTTP GET request
+
+		string url = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/codelist/ESTAT/" + variable +
+		             "?format=TSV&lang=" + language;
+
+		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
+		auto response = HttpRequest::ExecuteHttpRequest(settings, url, "GET", HttpHeaders(), "", "");
+
+		if (response.status_code != 200) {
+			throw IOException("EUROSTAT: Failed to fetch dictionary of variable='%s': (%d) %s", variable.c_str(),
+			                  response.status_code, response.error.c_str());
+		}
+		if (!response.error.empty()) {
+			throw IOException("EUROSTAT: " + response.error);
+		}
+
+		// Parse TSV response (Code + Value).
+
+		std::istringstream line_stream(response.body);
+		std::string line;
+
+		while (std::getline(line_stream, line)) {
+			if (line.empty()) {
+				continue;
+			}
+
+			auto sep_pos = line.find('\t');
+			if (sep_pos == string::npos) {
+				continue;
+			}
+
+			auto code = line.substr(0, sep_pos);
+			auto value = line.substr(sep_pos + 1);
+			StringUtil::Trim(code);
+			StringUtil::Trim(value);
+
+			rows.emplace_back(DictEntry {std::move(code), std::move(value)});
+		}
+
+		return rows;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Bind
+	//------------------------------------------------------------------------------------------------------------------
+
+	struct BindData final : TableFunctionData {
+		std::vector<DictEntry> rows;
+
+		explicit BindData(std::vector<DictEntry> rows) : rows(std::move(rows)) {
+		}
+	};
+
+	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
+	                                     vector<LogicalType> &return_types, vector<string> &names) {
+		D_ASSERT(input.inputs.size() == 1);
+
+		const string variable = StringValue::Get(input.inputs[0]);
+		string language = "en";
+
+		// Extract desired Language from named parameters
+
+		auto options_param = input.named_parameters.find("language");
+
+		if (options_param != input.named_parameters.end()) {
+			auto &item = options_param->second;
+
+			if (!item.IsNull() && item.type() == LogicalType::VARCHAR) {
+				language = item.GetValue<string>();
+			}
+		}
+		if (language.empty()) {
+			language = "en";
+		}
+
+		// Get list of dictionary entries of a coded variable
+
+		names.emplace_back("code");
+		return_types.push_back(LogicalType::VARCHAR);
+		names.emplace_back("value");
+		return_types.push_back(LogicalType::VARCHAR);
+
+		std::vector<DictEntry> rows = ES_DataDictionary::GetDictionaryOf(context, variable, language);
+
+		return make_uniq_base<FunctionData, BindData>(std::move(rows));
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Init
+	//------------------------------------------------------------------------------------------------------------------
+
+	struct State final : GlobalTableFunctionState {
+		idx_t current_row;
+		explicit State() : current_row(0) {
+		}
+	};
+
+	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
+		return make_uniq_base<GlobalTableFunctionState, State>();
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Cardinality
+	//------------------------------------------------------------------------------------------------------------------
+
+	static unique_ptr<NodeStatistics> Cardinality(ClientContext &context, const FunctionData *data) {
+		auto &bind_data = data->Cast<BindData>();
+		auto result = make_uniq<NodeStatistics>();
+
+		// This is the maximum number of rows
+		result->has_max_cardinality = true;
+		result->max_cardinality = bind_data.rows.size();
+
+		return result;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Execute
+	//------------------------------------------------------------------------------------------------------------------
+
+	static void Execute(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
+		auto &bind_data = input.bind_data->Cast<BindData>();
+		auto &gstate = input.global_state->Cast<State>();
+
+		// Calculate how many record we can fit in the output
+		const auto output_size = std::min<idx_t>(STANDARD_VECTOR_SIZE, bind_data.rows.size() - gstate.current_row);
+		const auto current_row = gstate.current_row;
+
+		if (output_size == 0) {
+			output.SetCardinality(0);
+			return;
+		}
+
+		// Load current subset of rows.
+		for (idx_t row_idx = 0, record_idx = current_row; row_idx < output_size; row_idx++, record_idx++) {
+			const auto &dict_entry = bind_data.rows[record_idx];
+			output.data[0].SetValue(row_idx, dict_entry.code);
+			output.data[1].SetValue(row_idx, dict_entry.value);
+		}
+
+		// Update the point index
+		gstate.current_row += output_size;
+
+		// Set the cardinality of the output
+		output.SetCardinality(output_size);
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Documentation
+	//------------------------------------------------------------------------------------------------------------------
+
+	static constexpr auto DESCRIPTION = R"(
+		Returns the dictionary of codes and values of a given coded variable from Eurostat.
+	)";
+
+	static constexpr auto EXAMPLE = R"(
+		SELECT
+			code, value
+		FROM
+			EUROSTAT_GetDictionary('cities', language := 'en')
+		;
+
+		┌─────────┬────────────────────────────────────────────┐
+		│  code   │                   value                    │
+		│ varchar │                  varchar                   │
+		├─────────┼────────────────────────────────────────────┤
+		│ AL001C  │ Tirana                                     │
+		│ AT      │ Austria                                    │
+		│ AT001C  │ Wien (greater city)                        │
+		│ AT001F  │ Wien                                       │
+		│ ·       │    ·                                       │
+		│ ·       │    ·                                       │
+		│ ·       │    ·                                       │
+		│ UK135F  │ Derry & Strabane Local Government District │
+		│ XK001C  │ Prishtinë/Priština                         │
+		└─────────┴────────────────────────────────────────────┘
+	)";
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Register
+	//------------------------------------------------------------------------------------------------------------------
+
+	static void Register(ExtensionLoader &loader) {
+		InsertionOrderPreservingMap<string> tags;
+		tags.insert("ext", "eurostat");
+		tags.insert("category", "table");
+
+		TableFunction func("EUROSTAT_DataDictionary", {LogicalType::VARCHAR}, Execute, Bind, Init);
+
+		func.cardinality = Cardinality;
+		func.named_parameters["language"] = LogicalType::VARCHAR;
+
+		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+	};
+};
+
 } // namespace
 
 // #####################################################################################################################
@@ -1118,6 +1330,7 @@ void EurostatInfoFunctions::Register(ExtensionLoader &loader) {
 	ES_Endpoints::Register(loader);
 	ES_Dataflows::Register(loader);
 	ES_DataStructure::Register(loader);
+	ES_DataDictionary::Register(loader);
 }
 
 } // namespace duckdb

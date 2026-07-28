@@ -1,6 +1,11 @@
 Release history
 ---------------
 
+0.4.0
+++++++++++++++++++
+
+- Add `EUROSTAT_DataDictionary` table function to retrieve the dictionary of a given coded variable from Eurostat.
+
 0.3.0
 ++++++++++++++++++
 
