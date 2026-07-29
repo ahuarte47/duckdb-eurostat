@@ -1249,7 +1249,7 @@ struct ES_DataDictionary {
 		SELECT
 			code, value
 		FROM
-			EUROSTAT_GetDictionary('cities', language := 'en')
+			EUROSTAT_DataDictionary('cities', language := 'en')
 		;
 
 		┌─────────┬────────────────────────────────────────────┐

@@ -119,6 +119,35 @@ This is the list of available functions:
 	on the `geo` dimension values. See the function [EUROSTAT_GetGeoLevelFromGeoCode](#eurostat_getgeolevelfromgeocode) below for
 	more details.
 
++ ### EUROSTAT_DataDictionary
+
+    Returns the dictionary of codes and values of a given coded variable from Eurostat.
+
+    ```sql
+	SELECT
+		code,
+		value
+	FROM
+		EUROSTAT_DataDictionary('cities', language := 'en')
+	;
+	```
+	```sql
+	┌─────────┬────────────────────────────────────────────┐
+	│  code   │                   value                    │
+	│ varchar │                  varchar                   │
+	├─────────┼────────────────────────────────────────────┤
+	│ AL001C  │ Tirana                                     │
+	│ AT      │ Austria                                    │
+	│ AT001C  │ Wien (greater city)                        │
+	│ AT001F  │ Wien                                       │
+	│ ·       │    ·                                       │
+	│ ·       │    ·                                       │
+	│ ·       │    ·                                       │
+	│ UK135F  │ Derry & Strabane Local Government District │
+	│ XK001C  │ Prishtinë/Priština                         │
+	└─────────┴────────────────────────────────────────────┘
+    ```
+
 + ### EUROSTAT_Read
 
     Reads the dataset of an EUROSTAT Dataflow.
