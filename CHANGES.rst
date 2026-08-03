@@ -1,6 +1,11 @@
 Release history
 ---------------
 
+0.5.0
+++++++++++++++++++
+
+- New optional parameter `include_flags` in the `EUROSTAT_Read` table function to include observation flags.
+
 0.4.0
 ++++++++++++++++++
 
