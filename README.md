@@ -168,6 +168,34 @@ This is the list of available functions:
 	└─────────┴─────────┴─────────┴─────────┴─────────┴───────────┴─────────────┴───────────────────┘
     ```
 
+	To keep Eurostat observation flags (e.g. `e`, `b`, `p`, `f`) in a separate column, add `include_flags := true`:
+
+	```sql
+	SELECT
+		geo,
+		time_period,
+		observation_value,
+		observation_flag
+	FROM
+		EUROSTAT_Read('ESTAT', 'road_pa_buscoa', include_flags := true)
+	WHERE
+		observation_flag IS NOT NULL
+	LIMIT 5
+	;
+	```
+	```sql
+	┌─────────┬─────────────┬───────────────────┬──────────────────┐
+	│   geo   │ time_period │ observation_value │ observation_flag │
+	│ varchar │   varchar   │      double       │     varchar      │
+	├─────────┼─────────────┼───────────────────┼──────────────────┤
+	│ HU      │ 2024        │           691.787 │ p                │
+	│ MT      │ 2013        │              NULL │ m                │
+	│ MT      │ 2014        │              NULL │ m                │
+	│ MT      │ 2015        │              NULL │ m                │
+	│ MT      │ 2016        │              NULL │ m                │
+	└─────────┴─────────────┴───────────────────┴──────────────────┘
+	```
+
 	Extension supports pushdown of T-SQL filters on dimensions, which are encoded and sent to the
 	EUROSTAT API to filter the data before being loaded into DuckDB.
 

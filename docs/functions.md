@@ -233,13 +233,16 @@ FROM
 #### Signature
 
 ```sql
-EUROSTAT_Read (provider VARCHAR, dataflow VARCHAR)
+EUROSTAT_Read (provider VARCHAR, dataflow VARCHAR, [include_flags BOOLEAN = false])
 ```
 
 #### Description
 
 
 Returns the dataset of an EUROSTAT Dataflow.
+
+Use `include_flags := true` to add an `observation_flag` column with Eurostat observation flags
+such as `e` (estimated), `b` (break in time series), `p` (provisional), `f` (forecast), etc.
 
 
 #### Example
@@ -257,6 +260,28 @@ SELECT * FROM EUROSTAT_Read('ESTAT', 'DEMO_R_D2JAN') LIMIT 5;
 │ A       │ NR      │ F       │ TOTAL   │ AL      │ country   │ 2003        │         1526180.0 │
 │ A       │ NR      │ F       │ TOTAL   │ AL      │ country   │ 2004        │         1520481.0 │
 └─────────┴─────────┴─────────┴─────────┴─────────┴───────────┴─────────────┴───────────────────┘
+
+SELECT
+	geo,
+	time_period,
+	observation_value,
+	observation_flag
+FROM
+	EUROSTAT_Read('ESTAT', 'road_pa_buscoa', include_flags := true)
+WHERE
+	observation_flag IS NOT NULL
+LIMIT 5;
 ```
+
+┌─────────┬─────────────┬───────────────────┬──────────────────┐
+│   geo   │ time_period │ observation_value │ observation_flag │
+│ varchar │   varchar   │      double       │     varchar      │
+├─────────┼─────────────┼───────────────────┼──────────────────┤
+│ HU      │ 2024        │           691.787 │ p                │
+│ MT      │ 2013        │              NULL │ m                │
+│ MT      │ 2014        │              NULL │ m                │
+│ MT      │ 2015        │              NULL │ m                │
+│ MT      │ 2016        │              NULL │ m                │
+└─────────┴─────────────┴───────────────────┴──────────────────┘
 
 ----

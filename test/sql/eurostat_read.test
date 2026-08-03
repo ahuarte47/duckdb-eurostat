@@ -53,3 +53,15 @@ LIMIT 2
 ----
 2006-05	0103	FR
 2006-05	0103	FR
+
+# Include observation flags from EUROSTAT values (e.g. e, b, p, f)
+query I
+SELECT
+    CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+FROM
+    EUROSTAT_Read('ESTAT', 'road_pa_buscoa', include_flags := true)
+WHERE
+    observation_flag IS NOT NULL
+;
+----
+1

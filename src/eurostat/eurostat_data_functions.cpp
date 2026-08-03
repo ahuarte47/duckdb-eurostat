@@ -57,11 +57,13 @@ struct ES_Read {
 		string dataflow_id;
 		std::vector<eurostat::Dimension> data_structure;
 		std::vector<string> complex_filters;
+		bool include_flags = false;
 		std::size_t limit = 0;
 
 		explicit BindData(const string &provider_id, const string &dataflow_id,
-		                  const std::vector<eurostat::Dimension> &data_structure)
-		    : provider_id(provider_id), dataflow_id(dataflow_id), data_structure(std::move(data_structure)) {
+		                  const std::vector<eurostat::Dimension> &data_structure, const bool include_flags)
+		    : provider_id(provider_id), dataflow_id(dataflow_id), data_structure(std::move(data_structure)),
+		      include_flags(include_flags) {
 		}
 	};
 
@@ -86,6 +88,17 @@ struct ES_Read {
 			throw InvalidInputException("EUROSTAT: Unknown Endpoint '%s'.", provider_id.c_str());
 		}
 
+		bool include_flags = false;
+		auto options_param = input.named_parameters.find("include_flags");
+
+		if (options_param != input.named_parameters.end()) {
+			auto &item = options_param->second;
+
+			if (!item.IsNull() && item.type() == LogicalType::BOOLEAN) {
+				include_flags = item.GetValue<bool>();
+			}
+		}
+
 		// Get dataflow metadata.
 
 		auto data_structure = EurostatUtils::DataStructureOf(context, provider_id, dataflow_id);
@@ -97,7 +110,12 @@ struct ES_Read {
 		names.emplace_back("observation_value");
 		return_types.push_back(LogicalType::DOUBLE);
 
-		return unique_ptr<FunctionData>(new BindData(provider_id, dataflow_id, data_structure));
+		if (include_flags) {
+			names.emplace_back("observation_flag");
+			return_types.push_back(LogicalType::VARCHAR);
+		}
+
+		return unique_ptr<FunctionData>(new BindData(provider_id, dataflow_id, data_structure, include_flags));
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -113,7 +131,16 @@ struct ES_Read {
 	struct Datarow {
 		size_t dimension_index;
 		string time_period;
+		bool has_observation_value = false;
 		double observation_value = NAN;
+		string observation_flag;
+	};
+
+	struct ParsedObservation {
+		bool parsed = false;
+		bool has_observation_value = false;
+		double observation_value = NAN;
+		string observation_flag;
 	};
 
 	struct State final : GlobalTableFunctionState {
@@ -126,10 +153,85 @@ struct ES_Read {
 		}
 	};
 
+	//! Parse an observation value from a raw string, handling special cases and flags.
+	static ParsedObservation ParseObservationValue(const string &raw_value, const bool include_flags) {
+		ParsedObservation result;
+
+		string value_str = raw_value;
+		StringUtil::Trim(value_str);
+
+		if (value_str.empty()) {
+			return result;
+		}
+
+		std::istringstream value_stream(value_str);
+		std::vector<string> parts;
+		string part;
+
+		while (std::getline(value_stream, part, ' ')) {
+			if (!part.empty()) {
+				parts.emplace_back(part);
+			}
+		}
+		if (parts.empty()) {
+			return result;
+		}
+
+		string first = parts[0];
+
+		if (first == ":") {
+			if (include_flags) {
+				result.parsed = true;
+				for (size_t i = 1; i < parts.size(); i++) {
+					if (!result.observation_flag.empty()) {
+						result.observation_flag += " ";
+					}
+					result.observation_flag += StringUtil::Lower(parts[i]);
+				}
+			}
+			return result;
+		}
+
+		double value = 0.0;
+
+		if (first == "0n") {
+			result.parsed = true;
+			result.has_observation_value = true;
+			result.observation_value = 0.0;
+			if (include_flags) {
+				result.observation_flag = "0n";
+				for (size_t i = 1; i < parts.size(); i++) {
+					result.observation_flag += " ";
+					result.observation_flag += StringUtil::Lower(parts[i]);
+				}
+			}
+			return result;
+		}
+
+		if (!TryCast::Operation(string_t(first), value, false)) {
+			return result;
+		}
+
+		result.parsed = true;
+		result.has_observation_value = true;
+		result.observation_value = value;
+
+		if (include_flags && parts.size() > 1) {
+			for (size_t i = 1; i < parts.size(); i++) {
+				if (!result.observation_flag.empty()) {
+					result.observation_flag += " ";
+				}
+				result.observation_flag += StringUtil::Lower(parts[i]);
+			}
+		}
+
+		return result;
+	}
+
 	//! Parse a data row from a TSV line.
 	static bool ParseDatarow(State &data_table, const std::vector<string> &time_periods, int32_t geo_column_index,
 	                         const string &line, std::unordered_map<string, bool> &row_keys, const bool &check_keys,
-	                         const std::size_t &row_limit) {
+	                         const std::size_t &row_limit, const bool include_flags) {
 		std::vector<bool> state_keys;
 
 		// Split line by tabs.
@@ -190,28 +292,28 @@ struct ES_Read {
 				continue;
 			}
 
-			string value_str = tokens[i + 1];
-			StringUtil::Trim(value_str);
+			if (i + 1 >= tokens.size()) {
+				continue;
+			}
 
-			// Store the row.
+			auto parsed_observation = ParseObservationValue(tokens[i + 1], include_flags);
+			if (!parsed_observation.parsed) {
+				continue;
+			}
 
-			if (!value_str.empty() && value_str != ":") {
-				double value = 0.0;
+			Datarow datarow;
+			datarow.dimension_index = data_table.dimensions.size() - 1;
+			datarow.time_period = time_periods[i];
+			datarow.has_observation_value = parsed_observation.has_observation_value;
+			datarow.observation_value = parsed_observation.observation_value;
+			datarow.observation_flag = std::move(parsed_observation.observation_flag);
 
-				if (TryCast::Operation(string_t(value_str), value, false)) {
-					Datarow datarow;
-					datarow.dimension_index = data_table.dimensions.size() - 1;
-					datarow.time_period = time_periods[i];
-					datarow.observation_value = value;
+			data_table.rows.emplace_back(datarow);
 
-					data_table.rows.emplace_back(datarow);
-
-					// Do we can stop parsing more rows?
-					if (row_limit > 0 && data_table.rows.size() >= row_limit) {
-						EUROSTAT_SCAN_DEBUG_LOG(1, "LIMIT pushdown %li reached, stopping parsing!", row_limit);
-						return true;
-					}
-				}
+			// Do we can stop parsing more rows?
+			if (row_limit > 0 && data_table.rows.size() >= row_limit) {
+				EUROSTAT_SCAN_DEBUG_LOG(1, "LIMIT pushdown %li reached, stopping parsing!", row_limit);
+				return true;
 			}
 		}
 		return true;
@@ -259,6 +361,7 @@ struct ES_Read {
 		std::copy(input.column_ids.begin(), input.column_ids.end(), std::back_inserter(data_table.column_ids));
 		const string &provider_id = bind_data.provider_id;
 		const string &dataflow_id = bind_data.dataflow_id;
+		const bool include_flags = bind_data.include_flags;
 		const std::size_t &row_limit = bind_data.limit;
 
 		const auto it = eurostat::ENDPOINTS.find(provider_id);
@@ -370,7 +473,8 @@ struct ES_Read {
 
 					} else {
 						// Add data row.
-						ParseDatarow(data_table, time_periods, geo_column_index, line, row_keys, check_keys, row_limit);
+						ParseDatarow(data_table, time_periods, geo_column_index, line, row_keys, check_keys, row_limit,
+						             include_flags);
 					}
 					line_index++;
 				}
@@ -457,7 +561,18 @@ struct ES_Read {
 					output.data[col_idx].SetValue(row_idx, Value(datarow.time_period));
 				} else if (dim_index == dim_count + 1) {
 					// Set observation value.
-					output.data[col_idx].SetValue(row_idx, Value(datarow.observation_value));
+					if (datarow.has_observation_value) {
+						output.data[col_idx].SetValue(row_idx, Value(datarow.observation_value));
+					} else {
+						output.data[col_idx].SetValue(row_idx, Value());
+					}
+				} else if (dim_index == dim_count + 2) {
+					// Set observation flag.
+					if (datarow.observation_flag.empty()) {
+						output.data[col_idx].SetValue(row_idx, Value());
+					} else {
+						output.data[col_idx].SetValue(row_idx, Value(datarow.observation_flag));
+					}
 				} else {
 					// Set dimension value.
 					output.data[col_idx].SetValue(row_idx, Value(dim_values.values[dim_index]));
@@ -539,6 +654,7 @@ struct ES_Read {
 		tags.insert("category", "table");
 
 		TableFunction func("EUROSTAT_Read", {LogicalType::VARCHAR, LogicalType::VARCHAR}, Execute, Bind, Init);
+		func.named_parameters["include_flags"] = LogicalType::BOOLEAN;
 
 		// Enable projection pushdown - allows DuckDB to tell us which columns are needed
 		// The column_ids will be passed to InitGlobal via TableFunctionInitInput
