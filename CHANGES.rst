@@ -1,6 +1,12 @@
 Release history
 ---------------
 
+0.5.1
+++++++++++++++++++
+
+- Fix performance of requests caching with the default TTL to 30 seconds.
+- Add support for basic & bearer authentication via secrets (TYPE http).
+
 0.5.0
 ++++++++++++++++++
 

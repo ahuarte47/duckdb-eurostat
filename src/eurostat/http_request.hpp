@@ -10,6 +10,17 @@
 
 namespace duckdb {
 
+//! Struct to hold basic authentication credentials
+struct BasicAuth {
+	string username;
+	string password;
+};
+
+//! Struct to hold bearer token authentication credentials
+struct BearerTokenAuth {
+	string token;
+};
+
 // *** NOTE:
 // 	Code in this file was extracted from 'duckdb_http_request' extension:
 // 	https://github.com/midwork-finds-jobs/duckdb_http_request
@@ -17,6 +28,8 @@ namespace duckdb {
 
 //! Struct to hold HTTP settings extracted from context (thread-safe to pass to workers)
 struct HttpSettings {
+	BasicAuth basic_auth;
+	BearerTokenAuth bearer_token_auth;
 	uint64_t timeout;
 	bool keep_alive;
 	string proxy;
@@ -53,6 +66,11 @@ struct HttpRequest {
 	static HttpResponseData ExecuteHttpRequest(const HttpSettings &settings, const string &url, const string &method,
 	                                           const HttpHeaders &headers, const string &request_body,
 	                                           const string &content_type);
+
+	// Execute HTTP request with given settings, and optional cache TTL in seconds (0 means no caching)
+	static HttpResponseData ExecuteHttpRequest(const HttpSettings &settings, const string &url, const string &method,
+	                                           const HttpHeaders &headers, const string &request_body,
+	                                           const string &content_type, int32_t ttl_seconds);
 };
 
 } // namespace duckdb
