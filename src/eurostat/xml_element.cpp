@@ -1,13 +1,7 @@
 #include "xml_element.hpp"
+#include <limits>
 
 namespace duckdb {
-
-//! Silent structured error handler for XPath errors
-static void XMLSilentXPathErrorHandler(void *ctx, const xmlError *error) {
-	// This handler is set on individual XPath contexts to suppress errors like "Undefined namespace prefix"
-	// Silently ignore XPath errors without printing to stderr
-	// This is thread-safe because it's set per-context, not globally
-}
 
 XmlDocument::XmlDocument(const std::string &xml_str) : doc(nullptr), xpath_ctx(nullptr) {
 	// Parse the XML with options to suppress error messages (thread-safe, per-operation config)
@@ -16,7 +10,8 @@ XmlDocument::XmlDocument(const std::string &xml_str) : doc(nullptr), xpath_ctx(n
 	// Note: We intentionally DO NOT use XML_PARSE_RECOVER to maintain strict parsing behavior
 	xmlParserCtxtPtr parser_ctx = xmlNewParserCtxt();
 	if (parser_ctx) {
-		doc = xmlCtxtReadMemory(parser_ctx, xml_str.c_str(), xml_str.length(), nullptr, nullptr,
+		const auto xml_size = static_cast<int>(xml_str.length());
+		doc = xmlCtxtReadMemory(parser_ctx, xml_str.c_str(), xml_size, nullptr, nullptr,
 		                        XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
 	} else {
 		throw IOException("Failed to create XML parser context.");
@@ -38,7 +33,7 @@ XmlDocument::XmlDocument(const std::string &xml_str) : doc(nullptr), xpath_ctx(n
 	}
 
 	// Set silent error handler on XPath context
-	xmlSetStructuredErrorFunc(xpath_ctx, XMLSilentXPathErrorHandler);
+	xmlSetStructuredErrorFunc(xpath_ctx, [](void *, auto) {});
 	// Register all namespace declarations
 	RegisterNamespaces(xpath_ctx);
 }
@@ -77,7 +72,7 @@ void XmlDocument::RegisterNamespaces(xmlXPathContextPtr xpath_ctx) {
 	}
 
 	// Register each namespace with a prefix
-	for (int i = 0; ns_list[i] != NULL; i++) {
+	for (int i = 0; ns_list[i] != nullptr; i++) {
 		xmlNsPtr ns = ns_list[i];
 
 		// Only register namespaces that have a prefix (skip default namespace)
@@ -88,7 +83,7 @@ void XmlDocument::RegisterNamespaces(xmlXPathContextPtr xpath_ctx) {
 	}
 
 	// Free the array (but not the namespace structures themselves, they belong to the document)
-	xmlFree(ns_list);
+	xmlFree(reinterpret_cast<void *>(ns_list));
 }
 
 // Initialize libxml2 (call once at extension load)
@@ -105,13 +100,14 @@ void XmlUtils::Cleanup() {
 XmlElement XmlUtils::ProcessNode(xmlNodePtr node) {
 	XmlElement element;
 
-	if (!node)
+	if (!node) {
 		return element;
+	}
 
 	// Get ID attribute if present
 	xmlChar *id = xmlGetProp(node, BAD_CAST "id");
 	if (id) {
-		element.id = std::string((const char *)id);
+		element.id = std::string(reinterpret_cast<const char *>(id));
 		xmlFree(id);
 	}
 
@@ -119,7 +115,7 @@ XmlElement XmlUtils::ProcessNode(xmlNodePtr node) {
 	if (node->type == XML_TEXT_NODE) {
 		element.name = "#text";
 		if (node->content) {
-			element.text_content = std::string((const char *)node->content);
+			element.text_content = std::string(reinterpret_cast<const char *>(node->content));
 		}
 		element.line_number = xmlGetLineNo(node);
 		return element;
@@ -127,7 +123,7 @@ XmlElement XmlUtils::ProcessNode(xmlNodePtr node) {
 
 	// Set name
 	if (node->name) {
-		element.name = std::string((const char *)node->name);
+		element.name = std::string(reinterpret_cast<const char *>(node->name));
 	}
 
 	// Set text content (for element nodes, get direct text content only)
@@ -135,13 +131,13 @@ XmlElement XmlUtils::ProcessNode(xmlNodePtr node) {
 		// Get only direct text children, not all descendants
 		for (xmlNodePtr child = node->children; child; child = child->next) {
 			if (child->type == XML_TEXT_NODE && child->content) {
-				element.text_content += std::string((const char *)child->content);
+				element.text_content += std::string(reinterpret_cast<const char *>(child->content));
 			}
 		}
 	} else {
 		xmlChar *content = xmlNodeGetContent(node);
 		if (content) {
-			element.text_content = std::string((const char *)content);
+			element.text_content = std::string(reinterpret_cast<const char *>(content));
 			xmlFree(content);
 		}
 	}
@@ -149,15 +145,15 @@ XmlElement XmlUtils::ProcessNode(xmlNodePtr node) {
 	// Set attributes
 	for (xmlAttrPtr attr = node->properties; attr; attr = attr->next) {
 		if (attr->name && attr->children && attr->children->content) {
-			std::string attr_name((const char *)attr->name);
-			std::string attr_value((const char *)attr->children->content);
+			std::string attr_name(reinterpret_cast<const char *>(attr->name));
+			std::string attr_value(reinterpret_cast<const char *>(attr->children->content));
 			element.attributes[attr_name] = attr_value;
 		}
 	}
 
 	// Set namespace URI
 	if (node->ns && node->ns->href) {
-		element.namespace_uri = std::string((const char *)node->ns->href);
+		element.namespace_uri = std::string(reinterpret_cast<const char *>(node->ns->href));
 	}
 
 	// Set path
@@ -200,15 +196,17 @@ std::string XmlUtils::GetNodeTextContent(xmlNodePtr node, const std::string &def
 
 //! Get the full XPath-like path of a XML node
 std::string XmlUtils::GetNodePath(xmlNodePtr node) {
-	if (!node)
+	if (!node) {
 		return "";
+	}
 
 	std::vector<std::string> path_parts;
 	xmlNodePtr current = node;
 
 	while (current && current->type == XML_ELEMENT_NODE) {
 		if (current->name) {
-			path_parts.insert(path_parts.begin(), std::string((const char *)current->name));
+			std::string node_name(reinterpret_cast<const char *>(current->name));
+			path_parts.insert(path_parts.begin(), node_name);
 		}
 		current = current->parent;
 	}

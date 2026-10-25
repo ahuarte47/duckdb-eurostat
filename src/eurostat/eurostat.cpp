@@ -14,17 +14,19 @@ std::string Dimension::GetGeoLevelFromGeoCode(const std::string &geo_code) {
 		return "aggregate";
 	}
 
+	const auto &country_codes = CountryCode::GetCountryCodes();
+
 	switch (geo_code.length()) {
 	case 2:
-		return (COUNTRY_CODES.find(geo_code) != COUNTRY_CODES.end()) ? "country" : "unknown";
+		return (country_codes.find(geo_code) != country_codes.end()) ? "country" : "unknown";
 	case 3:
-		return (COUNTRY_CODES.find(geo_code.substr(0, 2)) != COUNTRY_CODES.end()) ? "nuts1" : "unknown";
+		return (country_codes.find(geo_code.substr(0, 2)) != country_codes.end()) ? "nuts1" : "unknown";
 	case 4:
-		return (COUNTRY_CODES.find(geo_code.substr(0, 2)) != COUNTRY_CODES.end()) ? "nuts2" : "unknown";
+		return (country_codes.find(geo_code.substr(0, 2)) != country_codes.end()) ? "nuts2" : "unknown";
 	case 5:
-		return (COUNTRY_CODES.find(geo_code.substr(0, 2)) != COUNTRY_CODES.end()) ? "nuts3" : "unknown";
+		return (country_codes.find(geo_code.substr(0, 2)) != country_codes.end()) ? "nuts3" : "unknown";
 	case 7:
-		return (COUNTRY_CODES.find(geo_code.substr(0, 2)) != COUNTRY_CODES.end() && geo_code[2] == '_') ? "city"
+		return (country_codes.find(geo_code.substr(0, 2)) != country_codes.end() && geo_code[2] == '_') ? "city"
 		                                                                                                : "unknown";
 	default:
 		return "unknown";

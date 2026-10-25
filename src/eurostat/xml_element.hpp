@@ -28,7 +28,7 @@ struct XmlElement {
 //! Class to represent and manage one XML document
 class XmlDocument {
 public:
-	XmlDocument(const std::string &xml_str);
+	explicit XmlDocument(const std::string &xml_str);
 	~XmlDocument();
 
 public:

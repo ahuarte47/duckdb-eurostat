@@ -27,7 +27,7 @@ static int GetDebugLevel() {
 	static int level = -1;
 	if (level == -1) {
 		const char *env = std::getenv("EUROSTAT_DEBUG");
-		level = env ? std::atoi(env) : 0;
+		level = env ? std::stoi(env) : 0;
 	}
 	return level;
 }
@@ -62,13 +62,13 @@ struct ES_Read {
 
 		explicit BindData(const string &provider_id, const string &dataflow_id,
 		                  const std::vector<eurostat::Dimension> &data_structure, const bool include_flags)
-		    : provider_id(provider_id), dataflow_id(dataflow_id), data_structure(std::move(data_structure)),
+		    : provider_id(provider_id), dataflow_id(dataflow_id), data_structure(data_structure),
 		      include_flags(include_flags) {
 		}
 	};
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
-	                                     vector<LogicalType> &return_types, vector<string> &names) {
+	                                     vector<LogicalType> &return_types, vector<Identifier> &names) {
 		D_ASSERT(input.inputs.size() == 2);
 
 		const string &provider_id = StringValue::Get(input.inputs[0]);
@@ -84,7 +84,9 @@ struct ES_Read {
 			throw InvalidInputException("EUROSTAT: Second parameter, the 'dataflow' code, cannot be empty.");
 		}
 
-		if (eurostat::ENDPOINTS.find(provider_id) == eurostat::ENDPOINTS.end()) {
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
+
+		if (endpoints.find(provider_id) == endpoints.end()) {
 			throw InvalidInputException("EUROSTAT: Unknown Endpoint '%s'.", provider_id.c_str());
 		}
 
@@ -184,7 +186,7 @@ struct ES_Read {
 				result.parsed = true;
 				for (size_t i = 1; i < parts.size(); i++) {
 					if (!result.observation_flag.empty()) {
-						result.observation_flag += " ";
+						result.observation_flag += ' ';
 					}
 					result.observation_flag += StringUtil::Lower(parts[i]);
 				}
@@ -201,7 +203,7 @@ struct ES_Read {
 			if (include_flags) {
 				result.observation_flag = "0n";
 				for (size_t i = 1; i < parts.size(); i++) {
-					result.observation_flag += " ";
+					result.observation_flag += ' ';
 					result.observation_flag += StringUtil::Lower(parts[i]);
 				}
 			}
@@ -219,7 +221,7 @@ struct ES_Read {
 		if (include_flags && parts.size() > 1) {
 			for (size_t i = 1; i < parts.size(); i++) {
 				if (!result.observation_flag.empty()) {
-					result.observation_flag += " ";
+					result.observation_flag += ' ';
 				}
 				result.observation_flag += StringUtil::Lower(parts[i]);
 			}
@@ -364,7 +366,7 @@ struct ES_Read {
 		const bool include_flags = bind_data.include_flags;
 		const std::size_t &row_limit = bind_data.limit;
 
-		const auto it = eurostat::ENDPOINTS.find(provider_id);
+		const auto it = eurostat::Endpoint::GetEndpoints().find(provider_id);
 		string base_url = it->second.api_url + "data/" + dataflow_id;
 		int32_t url_count = 0;
 
@@ -515,7 +517,7 @@ struct ES_Read {
 				if (child->type == LogicalOperatorType::LOGICAL_GET) {
 					auto &get = child->Cast<LogicalGet>();
 
-					if (StringUtil::Lower(get.function.name) == "eurostat_read") {
+					if (StringUtil::Lower(get.function.GetName().GetIdentifierName()) == "eurostat_read") {
 						auto &bind_data = get.bind_data->Cast<BindData>();
 						bind_data.limit = limit.limit_val.GetConstantValue();
 						EUROSTAT_SCAN_DEBUG_LOG(1, "LIMIT pushdown: %zu", bind_data.limit);
@@ -543,7 +545,7 @@ struct ES_Read {
 		const auto current_row = gstate.current_row;
 
 		if (output_size == 0) {
-			output.SetCardinality(0);
+			output.SetChildCardinality(0);
 			return;
 		}
 
@@ -584,7 +586,7 @@ struct ES_Read {
 		gstate.current_row += output_size;
 
 		// Set the cardinality of the output.
-		output.SetCardinality(output_size);
+		output.SetChildCardinality(output_size);
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -649,12 +651,13 @@ struct ES_Read {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-		InsertionOrderPreservingMap<string> tags;
-		tags.insert("ext", "eurostat");
-		tags.insert("category", "table");
+		FunctionSignature signature;
+		signature.AddParameter("provider", LogicalType::VARCHAR);
+		signature.AddParameter("dataflow", LogicalType::VARCHAR);
+		signature.WithTypedKwargs("options",
+		                          [&](TypedKwargs &options) { options.Add("include_flags", LogicalType::BOOLEAN); });
 
-		TableFunction func("EUROSTAT_Read", {LogicalType::VARCHAR, LogicalType::VARCHAR}, Execute, Bind, Init);
-		func.named_parameters["include_flags"] = LogicalType::BOOLEAN;
+		TableFunction func("EUROSTAT_Read", std::move(signature), Execute, Bind, Init);
 
 		// Enable projection pushdown - allows DuckDB to tell us which columns are needed
 		// The column_ids will be passed to InitGlobal via TableFunctionInitInput
@@ -664,7 +667,13 @@ struct ES_Read {
 		// that cannot be represented as simple TableFilter objects
 		func.pushdown_complex_filter = PushdownComplexFilter;
 
-		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+		loader.RegisterFunction(func);
+
+		// Add documentation & tags for the table function
+		InsertionOrderPreservingMap<string> tags;
+		tags.insert("ext", "eurostat");
+		tags.insert("category", "table");
+		FunctionBuilder::AddTableFunctionDocs(loader, "EUROSTAT_Read", DESCRIPTION, EXAMPLE, tags);
 
 		// Register optimizer extension for LIMIT pushdown
 		auto &db = loader.GetDatabaseInstance();

@@ -3,8 +3,6 @@
 
 // DuckDB
 #include "duckdb.hpp"
-#include "duckdb/catalog/catalog_entry/function_entry.hpp"
-#include "duckdb/function/scalar_function.hpp"
 
 // EUROSTAT
 #include "eurostat.hpp"
@@ -51,14 +49,20 @@ struct ES_GeoLevel {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-		InsertionOrderPreservingMap<string> tags;
-		tags.insert("ext", "eurostat");
-		tags.insert("category", "scalar");
+		FunctionBuilder::RegisterScalar(loader, "EUROSTAT_GetGeoLevelFromGeoCode", [](ScalarFunctionBuilder &func) {
+			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geo_code", LogicalType::VARCHAR);
+				variant.SetReturnType(LogicalType::VARCHAR);
 
-		ScalarFunction func("EUROSTAT_GetGeoLevelFromGeoCode", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
-		                    ES_GeoLevel::GetGeoLevelFromGeoCode);
+				variant.SetFunction(ES_GeoLevel::GetGeoLevelFromGeoCode);
+				variant.CanThrowErrors();
+			});
 
-		RegisterFunction<ScalarFunction>(loader, func, CatalogType::SCALAR_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+			func.SetDescription(DESCRIPTION);
+			func.SetExample(EXAMPLE);
+			func.SetTag("ext", "eurostat");
+			func.SetTag("category", "scalar");
+		});
 	};
 };
 

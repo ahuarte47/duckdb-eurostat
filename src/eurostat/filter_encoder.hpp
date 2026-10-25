@@ -3,7 +3,11 @@
 #include "eurostat.hpp"
 #include "duckdb.hpp"
 #include "duckdb/planner/expression.hpp"
+#include "duckdb/planner/filter/conjunction_filter.hpp"
+#include "duckdb/planner/filter/constant_filter.hpp"
 #include "duckdb/planner/filter/in_filter.hpp"
+#include "duckdb/planner/filter/optional_filter.hpp"
+#include "duckdb/planner/table_filter_set.hpp"
 
 namespace duckdb {
 
@@ -22,7 +26,7 @@ struct EurostatFilter {
 	std::string end_period;
 
 	//! Constructor.
-	EurostatFilter(const std::vector<eurostat::Dimension> &ds);
+	explicit EurostatFilter(const std::vector<eurostat::Dimension> &ds);
 
 	//! Check if the expression is empty.
 	bool IsEmpty() const;
@@ -44,7 +48,7 @@ struct EurostatFilterSet {
 	bool supported = false;
 
 	//! Constructor.
-	EurostatFilterSet(const std::vector<eurostat::Dimension> &ds) : data_structure(ds) {
+	explicit EurostatFilterSet(const std::vector<eurostat::Dimension> &ds) : data_structure(ds) {
 		PushEmptyFilter();
 	}
 
@@ -110,27 +114,27 @@ private:
 	/**
 	 * Encode CONSTANT_COMPARISON filter (col OP value).
 	 */
-	static bool EncodeConstantComparison(const ConstantFilter &filter, const eurostat::Dimension &dimension,
+	static bool EncodeConstantComparison(const LegacyConstantFilter &filter, const eurostat::Dimension &dimension,
 	                                     const idx_t &dim_index, EurostatFilterSet &out_result);
 
 	/**
 	 * Encode IN_FILTER (col IN (values)).
 	 */
-	static bool EncodeInFilter(const InFilter &filter, const eurostat::Dimension &dimension, const idx_t &dim_index,
-	                           EurostatFilterSet &out_result);
+	static bool EncodeInFilter(const LegacyInFilter &filter, const eurostat::Dimension &dimension,
+	                           const idx_t &dim_index, EurostatFilterSet &out_result);
 
 	/**
 	 * Encode CONJUNCTION_AND filter.
 	 * All-or-nothing: if any child unsupported, entire AND is skipped.
 	 */
-	static bool EncodeConjunctionAnd(const ConjunctionAndFilter &filter, const eurostat::Dimension &dimension,
+	static bool EncodeConjunctionAnd(const LegacyConjunctionAndFilter &filter, const eurostat::Dimension &dimension,
 	                                 const idx_t &dim_index, EurostatFilterSet &out_result);
 
 	/**
 	 * Encode CONJUNCTION_OR filter.
 	 * All-or-nothing: if any child unsupported, entire OR is skipped.
 	 */
-	static bool EncodeConjunctionOr(const ConjunctionOrFilter &filter, const eurostat::Dimension &dimension,
+	static bool EncodeConjunctionOr(const LegacyConjunctionOrFilter &filter, const eurostat::Dimension &dimension,
 	                                const idx_t &dim_index, EurostatFilterSet &out_result);
 
 	//--------------------------------------------------------------------------

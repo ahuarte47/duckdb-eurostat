@@ -1,6 +1,11 @@
 Release history
 ---------------
 
+0.6.0
+++++++++++++++++++
+
+- Updated extension for DuckDB 2.0.0
+
 0.5.1
 ++++++++++++++++++
 

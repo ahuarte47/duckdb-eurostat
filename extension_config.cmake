@@ -4,8 +4,13 @@
 duckdb_extension_load(eurostat
     SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
     LOAD_TESTS
-    EXTENSION_VERSION 0.5.1
+    EXTENSION_VERSION 0.6.0
 )
 
 # Any extra extensions that should be built
 # e.g.: duckdb_extension_load(json)
+
+# Since DuckDB's v2.0-cyanoptera duckdb_extension_load() only decides what is built;
+# the shell and the test runner link an extension only when a config asks for it.
+# Linked as before the change.
+duckdb_extension_statically_link(eurostat)

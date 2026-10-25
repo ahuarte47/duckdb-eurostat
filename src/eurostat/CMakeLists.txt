@@ -1,6 +1,7 @@
 set(EXTENSION_SOURCES
     ${EXTENSION_SOURCES}
     ${CMAKE_CURRENT_SOURCE_DIR}/eurostat.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/function_builder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/http_request.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/xml_element.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/filter_encoder.cpp

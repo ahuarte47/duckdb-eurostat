@@ -1,5 +1,6 @@
 #include "eurostat_info_functions.hpp"
 #include "function_builder.hpp"
+#include <cstddef>
 #include <iterator>
 
 // DuckDB
@@ -40,7 +41,7 @@ struct ES_Endpoints {
 	};
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
-	                                     vector<LogicalType> &return_types, vector<string> &names) {
+	                                     vector<LogicalType> &return_types, vector<Identifier> &names) {
 		names.emplace_back("provider_id");
 		return_types.push_back(LogicalType::VARCHAR);
 		names.emplace_back("organization");
@@ -50,7 +51,8 @@ struct ES_Endpoints {
 		names.emplace_back("api_url");
 		return_types.push_back(LogicalType::VARCHAR);
 
-		return make_uniq_base<FunctionData, BindData>(eurostat::ENDPOINTS.size());
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
+		return make_uniq_base<FunctionData, BindData>(endpoints.size());
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -78,8 +80,10 @@ struct ES_Endpoints {
 		idx_t count = 0;
 		auto next_idx = MinValue<idx_t>(state.current_idx + STANDARD_VECTOR_SIZE, bind_data.endpoint_count);
 
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
+
 		for (; state.current_idx < next_idx; state.current_idx++) {
-			auto it = std::next(eurostat::ENDPOINTS.begin(), state.current_idx);
+			auto it = std::next(endpoints.begin(), static_cast<std::ptrdiff_t>(state.current_idx));
 			auto &provider_id = it->first;
 			auto &endpoint = it->second;
 
@@ -89,7 +93,7 @@ struct ES_Endpoints {
 			output.data[3].SetValue(count, endpoint.api_url);
 			count++;
 		}
-		output.SetCardinality(count);
+		output.SetChildCardinality(count);
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -120,12 +124,13 @@ struct ES_Endpoints {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
+		const TableFunction func("EUROSTAT_Endpoints", {}, Execute, Bind, Init);
+		loader.RegisterFunction(func);
+
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "table");
-
-		const TableFunction func("EUROSTAT_Endpoints", {}, Execute, Bind, Init);
-		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+		FunctionBuilder::AddTableFunctionDocs(loader, "EUROSTAT_Endpoints", DESCRIPTION, EXAMPLE, tags);
 	}
 };
 
@@ -174,10 +179,12 @@ struct ES_Dataflows {
 		yyjson_val *annotation_val = nullptr;
 		yyjson_val *attrib_val = nullptr;
 
-		if (!yyjson_is_obj(extension_val = yyjson_obj_get(object_val, "extension"))) {
+		extension_val = yyjson_obj_get(object_val, "extension");
+		if (!yyjson_is_obj(extension_val)) {
 			throw InvalidInputException("EUROSTAT: Missing or incorrect 'extension' attribute in dataflow metadata.");
 		}
-		if (!yyjson_is_arr(annotation_val = yyjson_obj_get(extension_val, "annotation"))) {
+		annotation_val = yyjson_obj_get(extension_val, "annotation");
+		if (!yyjson_is_arr(annotation_val)) {
 			throw InvalidInputException(
 			    "EUROSTAT: Missing or incorrect 'extension/annotation' attribute in dataflow metadata.");
 		}
@@ -187,34 +194,49 @@ struct ES_Dataflows {
 		DataflowInfo info;
 		info.provider_id = provider_id;
 
-		if (yyjson_is_str(attrib_val = yyjson_obj_get(extension_val, "id"))) {
+		attrib_val = yyjson_obj_get(extension_val, "id");
+		if (yyjson_is_str(attrib_val)) {
 			info.dataflow_id = string(yyjson_get_str(attrib_val));
 		}
-		if (yyjson_is_str(attrib_val = yyjson_obj_get(object_val, "class"))) {
+
+		attrib_val = yyjson_obj_get(object_val, "class");
+		if (yyjson_is_str(attrib_val)) {
 			info.type = string(yyjson_get_str(attrib_val));
 		}
-		if (yyjson_is_str(attrib_val = yyjson_obj_get(extension_val, "version"))) {
+
+		attrib_val = yyjson_obj_get(extension_val, "version");
+		if (yyjson_is_str(attrib_val)) {
 			info.version = string(yyjson_get_str(attrib_val));
 		}
-		if (yyjson_is_str(attrib_val = yyjson_obj_get(object_val, "label"))) {
+
+		attrib_val = yyjson_obj_get(object_val, "label");
+		if (yyjson_is_str(attrib_val)) {
 			info.label = string(yyjson_get_str(attrib_val));
 		}
-		if (yyjson_is_str(attrib_val = yyjson_obj_get(extension_val, "lang"))) {
+
+		attrib_val = yyjson_obj_get(extension_val, "lang");
+		if (yyjson_is_str(attrib_val)) {
 			info.language = string(yyjson_get_str(attrib_val));
 		}
 
-		if (load_datastructure && yyjson_is_obj(attrib_val = yyjson_obj_get(extension_val, "datastructure"))) {
-			const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
-			if (json) {
-				info.data_structure = string(json);
-				free((void *)json);
+		if (load_datastructure) {
+			attrib_val = yyjson_obj_get(extension_val, "datastructure");
+			if (yyjson_is_obj(attrib_val)) {
+				const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
+				if (json) {
+					info.data_structure = string(json);
+					free((void *)json);
+				}
 			}
 		}
-		if (load_annotations && yyjson_is_arr(attrib_val = yyjson_obj_get(extension_val, "annotation"))) {
-			const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
-			if (json) {
-				info.annotations = string(json);
-				free((void *)json);
+		if (load_annotations) {
+			attrib_val = yyjson_obj_get(extension_val, "annotation");
+			if (yyjson_is_arr(attrib_val)) {
+				const char *json = yyjson_val_write(attrib_val, YYJSON_WRITE_NOFLAG, nullptr);
+				if (json) {
+					info.annotations = string(json);
+					free((void *)json);
+				}
 			}
 		}
 
@@ -289,12 +311,12 @@ struct ES_Dataflows {
 
 		explicit BindData(const std::vector<string> &providers, const std::vector<string> &dataflows,
 		                  const string &language)
-		    : providers(std::move(providers)), dataflows(std::move(dataflows)), language(std::move(language)) {
+		    : providers(providers), dataflows(dataflows), language(language) {
 		}
 	};
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
-	                                     vector<LogicalType> &return_types, vector<string> &names) {
+	                                     vector<LogicalType> &return_types, vector<Identifier> &names) {
 		std::vector<string> providers;
 		std::vector<string> dataflows;
 		string language = "en";
@@ -331,8 +353,9 @@ struct ES_Dataflows {
 
 		// Extract desired API Endpoints from named parameters
 
-		auto options_param = input.named_parameters.find("providers");
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
 
+		auto options_param = input.named_parameters.find("providers");
 		if (options_param != input.named_parameters.end()) {
 			auto &items = options_param->second;
 
@@ -341,7 +364,7 @@ struct ES_Dataflows {
 					auto value = item.GetValue<string>();
 
 					// Validate Endpoint name
-					if (eurostat::ENDPOINTS.find(value) == eurostat::ENDPOINTS.end()) {
+					if (endpoints.find(value) == endpoints.end()) {
 						throw InvalidInputException("EUROSTAT: Unknown Endpoint '%s'.", value.c_str());
 					}
 					providers.push_back(value);
@@ -349,7 +372,7 @@ struct ES_Dataflows {
 			}
 		}
 		if (providers.empty()) {
-			for (const auto &it : eurostat::ENDPOINTS) {
+			for (const auto &it : endpoints) {
 				providers.push_back(it.first);
 			}
 		}
@@ -370,12 +393,12 @@ struct ES_Dataflows {
 						dataflows.clear();
 						break;
 					}
-					dataflows.push_back(value);
+					dataflows.emplace_back(value);
 				}
 			}
 		}
 		if (dataflows.empty()) {
-			dataflows.push_back("all");
+			dataflows.emplace_back("all");
 		}
 
 		// Extract desired Language from named parameters
@@ -406,7 +429,7 @@ struct ES_Dataflows {
 		idx_t current_row;
 
 		explicit State(const std::vector<column_t> &column_ids, const std::vector<DataflowInfo> &rows)
-		    : column_ids(std::move(column_ids)), rows(std::move(rows)), current_row(0) {
+		    : column_ids(column_ids), rows(rows), current_row(0) {
 		}
 	};
 
@@ -430,8 +453,10 @@ struct ES_Dataflows {
 		HttpSettings settings;
 		idx_t req_count = 0;
 
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
+
 		for (const auto &provider_id : providers) {
-			const auto it = eurostat::ENDPOINTS.find(provider_id);
+			const auto it = endpoints.find(provider_id);
 
 			for (const auto &dataflow_id : dataflows) {
 				string url = it->second.api_url + "dataflow/" + it->second.source_id + "/" + dataflow_id +
@@ -469,13 +494,13 @@ struct ES_Dataflows {
 					// Parse input metadata of dataflows
 
 					if (dataflow_id == "all") {
-						yyjson_val *link_val = nullptr;
-						yyjson_val *item_val = nullptr;
-
-						if (!yyjson_is_obj(link_val = yyjson_obj_get(root_val, "link"))) {
+						yyjson_val *link_val = yyjson_obj_get(root_val, "link");
+						if (!yyjson_is_obj(link_val)) {
 							throw InvalidInputException("EUROSTAT: Missing 'link' attribute in dataflow metadata.");
 						}
-						if (!yyjson_is_arr(item_val = yyjson_obj_get(link_val, "item"))) {
+
+						yyjson_val *item_val = yyjson_obj_get(link_val, "item");
+						if (!yyjson_is_arr(item_val)) {
 							throw InvalidInputException(
 							    "EUROSTAT: Missing 'link/item' attribute in dataflow metadata.");
 						}
@@ -518,7 +543,7 @@ struct ES_Dataflows {
 		const auto current_row = gstate.current_row;
 
 		if (output_size == 0) {
-			output.SetCardinality(0);
+			output.SetChildCardinality(0);
 			return;
 		}
 
@@ -610,7 +635,7 @@ struct ES_Dataflows {
 		gstate.current_row += output_size;
 
 		// Set the cardinality of the output
-		output.SetCardinality(output_size);
+		output.SetChildCardinality(output_size);
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -650,21 +675,25 @@ struct ES_Dataflows {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
-		InsertionOrderPreservingMap<string> tags;
-		tags.insert("ext", "eurostat");
-		tags.insert("category", "table");
+		FunctionSignature signature;
+		signature.WithTypedKwargs("options", [&](TypedKwargs &options) {
+			options.Add("providers", LogicalType::LIST(LogicalType::VARCHAR))
+			    .Add("dataflows", LogicalType::LIST(LogicalType::VARCHAR))
+			    .Add("language", LogicalType::VARCHAR);
+		});
 
-		TableFunction func("EUROSTAT_Dataflows", {}, Execute, Bind, Init);
-
-		func.named_parameters["providers"] = LogicalType::LIST(LogicalType::VARCHAR);
-		func.named_parameters["dataflows"] = LogicalType::LIST(LogicalType::VARCHAR);
-		func.named_parameters["language"] = LogicalType::VARCHAR;
+		TableFunction func("EUROSTAT_Dataflows", std::move(signature), Execute, Bind, Init);
 
 		// Enable projection pushdown - allows DuckDB to tell us which columns are needed
 		// The column_ids will be passed to InitGlobal via TableFunctionInitInput
 		func.projection_pushdown = true;
 
-		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+		loader.RegisterFunction(func);
+
+		InsertionOrderPreservingMap<string> tags;
+		tags.insert("ext", "eurostat");
+		tags.insert("category", "table");
+		FunctionBuilder::AddTableFunctionDocs(loader, "EUROSTAT_Dataflows", DESCRIPTION, EXAMPLE, tags);
 	}
 };
 
@@ -702,7 +731,8 @@ struct ES_DataStructure {
 
 		// Execute HTTP GET request
 
-		const auto it = eurostat::ENDPOINTS.find(provider_id);
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
+		const auto it = endpoints.find(provider_id);
 		string url = it->second.api_url + "dataflow/" + it->second.source_id + "/" + dataflow_id +
 		             "/latest?detail=referencepartial&references=descendants";
 
@@ -725,7 +755,9 @@ struct ES_DataStructure {
 		xmlXPathObjectPtr xpath_obj = nullptr;
 
 		for (const auto &xpath : {ES_DIMENSION_PATH, ES_TIME_DIMENSION_PATH}) {
-			if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST xpath, xpath_ctx)) && xpath_obj->nodesetval) {
+			xpath_obj = xmlXPathEvalExpression(BAD_CAST xpath, xpath_ctx);
+
+			if (xpath_obj != nullptr && xpath_obj->nodesetval) {
 				for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 					xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
 
@@ -733,7 +765,7 @@ struct ES_DataStructure {
 					if (!dim_id.empty()) {
 						Dimension dim;
 						dim.id = StringUtil::Lower(dim_id);
-						dim.position = std::atoi(XmlUtils::GetNodeAttributeValue(node, "position").c_str());
+						dim.position = std::stoi(XmlUtils::GetNodeAttributeValue(node, "position"));
 
 						// Get the Concept ID for the Dimension
 						xmlXPathContextPtr local_ctx = xmlXPathNewContext(doc_obj);
@@ -741,9 +773,9 @@ struct ES_DataStructure {
 							document.RegisterNamespaces(local_ctx);
 							local_ctx->node = node;
 
-							xmlXPathObjectPtr temp_obj = nullptr;
-							if ((temp_obj = xmlXPathEvalExpression(BAD_CAST "./s:ConceptIdentity/Ref", local_ctx)) &&
-							    temp_obj->nodesetval && temp_obj->nodesetval->nodeNr > 0) {
+							xmlXPathObjectPtr temp_obj =
+							    xmlXPathEvalExpression(BAD_CAST "./s:ConceptIdentity/Ref", local_ctx);
+							if (temp_obj != nullptr && temp_obj->nodesetval && temp_obj->nodesetval->nodeNr > 0) {
 								xmlNodePtr ref_node = temp_obj->nodesetval->nodeTab[0];
 								dim.concept_id = XmlUtils::GetNodeAttributeValue(ref_node, "id");
 							}
@@ -774,7 +806,9 @@ struct ES_DataStructure {
 
 		// Get the Concept names for Dimensions
 
-		if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_CONCEPT_PATH, xpath_ctx)) && xpath_obj->nodesetval) {
+		xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_CONCEPT_PATH, xpath_ctx);
+
+		if (xpath_obj != nullptr && xpath_obj->nodesetval) {
 			for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 				xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
 
@@ -783,7 +817,7 @@ struct ES_DataStructure {
 					for (auto &dim : dimensions) {
 						if (dim.concept_id == concept_id) {
 							for (xmlNodePtr child = node->children; child; child = child->next) {
-								if (strcmp((const char *)child->name, "Name") == 0) {
+								if (strcmp(reinterpret_cast<const char *>(child->name), "Name") == 0) {
 									string lang = XmlUtils::GetNodeAttributeValue(child, "lang", language);
 
 									if (lang == language || dim.concept_label.empty()) {
@@ -812,7 +846,8 @@ struct ES_DataStructure {
 
 		// Execute HTTP GET request
 
-		const auto it = eurostat::ENDPOINTS.find(provider_id);
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
+		const auto it = endpoints.find(provider_id);
 		string url = it->second.api_url + "contentconstraint/" + it->second.source_id + "/" + dataflow_id;
 
 		HttpSettings settings = HttpRequest::ExtractHttpSettings(context, url);
@@ -830,9 +865,9 @@ struct ES_DataStructure {
 
 		XmlDocument document = XmlDocument(response.body);
 		xmlXPathContextPtr xpath_ctx = document.GetXPathContext();
-		xmlXPathObjectPtr xpath_obj = nullptr;
+		xmlXPathObjectPtr xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_VALUES_PATH, xpath_ctx);
 
-		if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_VALUES_PATH, xpath_ctx)) && xpath_obj->nodesetval) {
+		if (xpath_obj != nullptr && xpath_obj->nodesetval) {
 			for (int i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 				xmlNodePtr node = xpath_obj->nodesetval->nodeTab[i];
 
@@ -843,7 +878,7 @@ struct ES_DataStructure {
 					for (auto &dim : dimensions) {
 						if (dim.id == dim_id) {
 							for (xmlNodePtr child = node->children; child; child = child->next) {
-								if (strcmp((const char *)child->name, "Value") == 0) {
+								if (strcmp(reinterpret_cast<const char *>(child->name), "Value") == 0) {
 									string code_value = XmlUtils::GetNodeTextContent(child);
 									dim.values.emplace_back(code_value);
 								}
@@ -872,12 +907,12 @@ struct ES_DataStructure {
 		std::vector<Dimension> rows;
 
 		explicit BindData(const string &provider_id, const string &dataflow_id, const std::vector<Dimension> &rows)
-		    : provider_id(provider_id), dataflow_id(dataflow_id), rows(std::move(rows)) {
+		    : provider_id(provider_id), dataflow_id(dataflow_id), rows(rows) {
 		}
 	};
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
-	                                     vector<LogicalType> &return_types, vector<string> &names) {
+	                                     vector<LogicalType> &return_types, vector<Identifier> &names) {
 		D_ASSERT(input.inputs.size() == 2);
 
 		const string provider_id = StringValue::Get(input.inputs[0]);
@@ -894,7 +929,9 @@ struct ES_DataStructure {
 			throw InvalidInputException("EUROSTAT: Second parameter, the 'dataflow' code, cannot be empty.");
 		}
 
-		if (eurostat::ENDPOINTS.find(provider_id) == eurostat::ENDPOINTS.end()) {
+		const auto &endpoints = eurostat::Endpoint::GetEndpoints();
+
+		if (endpoints.find(provider_id) == endpoints.end()) {
 			throw InvalidInputException("EUROSTAT: Unknown Endpoint '%s'.", provider_id.c_str());
 		}
 
@@ -975,7 +1012,7 @@ struct ES_DataStructure {
 		const auto current_row = gstate.current_row;
 
 		if (output_size == 0) {
-			output.SetCardinality(0);
+			output.SetChildCardinality(0);
 			return;
 		}
 
@@ -1020,7 +1057,7 @@ struct ES_DataStructure {
 		gstate.current_row += output_size;
 
 		// Set the cardinality of the output
-		output.SetCardinality(output_size);
+		output.SetChildCardinality(output_size);
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -1061,16 +1098,20 @@ struct ES_DataStructure {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
+		FunctionSignature signature;
+		signature.AddParameter("provider", LogicalType::VARCHAR);
+		signature.AddParameter("dataflow", LogicalType::VARCHAR);
+		signature.WithTypedKwargs("options",
+		                          [&](TypedKwargs &options) { options.Add("language", LogicalType::VARCHAR); });
+
+		TableFunction func("EUROSTAT_DataStructure", std::move(signature), Execute, Bind, Init);
+		func.cardinality = Cardinality;
+		loader.RegisterFunction(func);
+
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "table");
-
-		TableFunction func("EUROSTAT_DataStructure", {LogicalType::VARCHAR, LogicalType::VARCHAR}, Execute, Bind, Init);
-
-		func.cardinality = Cardinality;
-		func.named_parameters["language"] = LogicalType::VARCHAR;
-
-		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+		FunctionBuilder::AddTableFunctionDocs(loader, "EUROSTAT_DataStructure", DESCRIPTION, EXAMPLE, tags);
 	};
 };
 
@@ -1144,7 +1185,7 @@ struct ES_DataDictionary {
 	};
 
 	static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
-	                                     vector<LogicalType> &return_types, vector<string> &names) {
+	                                     vector<LogicalType> &return_types, vector<Identifier> &names) {
 		D_ASSERT(input.inputs.size() == 1);
 
 		const string variable = StringValue::Get(input.inputs[0]);
@@ -1219,7 +1260,7 @@ struct ES_DataDictionary {
 		const auto current_row = gstate.current_row;
 
 		if (output_size == 0) {
-			output.SetCardinality(0);
+			output.SetChildCardinality(0);
 			return;
 		}
 
@@ -1234,7 +1275,7 @@ struct ES_DataDictionary {
 		gstate.current_row += output_size;
 
 		// Set the cardinality of the output
-		output.SetCardinality(output_size);
+		output.SetChildCardinality(output_size);
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -1273,16 +1314,19 @@ struct ES_DataDictionary {
 	//------------------------------------------------------------------------------------------------------------------
 
 	static void Register(ExtensionLoader &loader) {
+		FunctionSignature signature;
+		signature.AddParameter("variable", LogicalType::VARCHAR);
+		signature.WithTypedKwargs("options",
+		                          [&](TypedKwargs &options) { options.Add("language", LogicalType::VARCHAR); });
+
+		TableFunction func("EUROSTAT_DataDictionary", std::move(signature), Execute, Bind, Init);
+		func.cardinality = Cardinality;
+		loader.RegisterFunction(func);
+
 		InsertionOrderPreservingMap<string> tags;
 		tags.insert("ext", "eurostat");
 		tags.insert("category", "table");
-
-		TableFunction func("EUROSTAT_DataDictionary", {LogicalType::VARCHAR}, Execute, Bind, Init);
-
-		func.cardinality = Cardinality;
-		func.named_parameters["language"] = LogicalType::VARCHAR;
-
-		RegisterFunction<TableFunction>(loader, func, CatalogType::TABLE_FUNCTION_ENTRY, DESCRIPTION, EXAMPLE, tags);
+		FunctionBuilder::AddTableFunctionDocs(loader, "EUROSTAT_DataDictionary", DESCRIPTION, EXAMPLE, tags);
 	};
 };
 
@@ -1309,12 +1353,11 @@ std::vector<eurostat::Dimension> EurostatUtils::DataStructureOf(ClientContext &c
 std::string EurostatUtils::GetXmlErrorMessage(const std::string &response_body) {
 	XmlDocument document = XmlDocument(response_body);
 	xmlXPathContextPtr xpath_ctx = document.GetXPathContext();
-	xmlXPathObjectPtr xpath_obj = nullptr;
+	xmlXPathObjectPtr xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_ERROR_PATH, xpath_ctx);
 
 	string error_msg;
 
-	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST ES_ERROR_PATH, xpath_ctx)) && xpath_obj->nodesetval &&
-	    xpath_obj->nodesetval->nodeNr > 0) {
+	if (xpath_obj != nullptr && xpath_obj->nodesetval && xpath_obj->nodesetval->nodeNr > 0) {
 		xmlNodePtr node = xpath_obj->nodesetval->nodeTab[0];
 		error_msg = XmlUtils::GetNodeTextContent(node);
 	}
