@@ -18,14 +18,14 @@ class AggregateFunctionBuilder;
 
 class FunctionBuilder {
 public:
-	template <class CALLBACK>
-	static void RegisterScalar(ExtensionLoader &loader, const char *name, CALLBACK &&callback);
+	template <class CALLBACK_TYPE>
+	static void RegisterScalar(ExtensionLoader &loader, const char *name, CALLBACK_TYPE &&callback);
 
-	template <class CALLBACK>
-	static void RegisterAggregate(ExtensionLoader &loader, const char *name, CALLBACK &&callback);
+	template <class CALLBACK_TYPE>
+	static void RegisterAggregate(ExtensionLoader &loader, const char *name, CALLBACK_TYPE &&callback);
 
-	template <class CALLBACK>
-	static void RegisterMacro(ExtensionLoader &loader, const char *name, CALLBACK &&callback);
+	template <class CALLBACK_TYPE>
+	static void RegisterMacro(ExtensionLoader &loader, const char *name, CALLBACK_TYPE &&callback);
 
 	// TODO:
 	static void AddTableFunctionDocs(ExtensionLoader &loader, const char *name, const char *desc, const char *example,
@@ -123,8 +123,8 @@ class ScalarFunctionBuilder {
 	friend class FunctionBuilder;
 
 public:
-	template <class CALLBACK>
-	void AddVariant(CALLBACK &&callback);
+	template <class CALLBACK_TYPE>
+	void AddVariant(CALLBACK_TYPE &&callback);
 	void SetTag(const string &key, const string &value);
 	void SetDescription(const string &desc);
 	void SetExample(const string &ex);
@@ -154,8 +154,8 @@ inline void ScalarFunctionBuilder::SetTag(const string &key, const string &value
 	tags[key] = value;
 }
 
-template <class CALLBACK>
-void ScalarFunctionBuilder::AddVariant(CALLBACK &&callback) {
+template <class CALLBACK_TYPE>
+void ScalarFunctionBuilder::AddVariant(CALLBACK_TYPE &&callback) {
 	ScalarFunctionVariantBuilder builder;
 
 	callback(builder);
@@ -217,16 +217,16 @@ inline void AggregateFunctionBuilder::CanThrowErrors() {
 // Function Builder Methods
 //------------------------------------------------------------------------------
 
-template <class CALLBACK>
-void FunctionBuilder::RegisterScalar(ExtensionLoader &loader, const char *name, CALLBACK &&callback) {
+template <class CALLBACK_TYPE>
+void FunctionBuilder::RegisterScalar(ExtensionLoader &loader, const char *name, CALLBACK_TYPE &&callback) {
 	ScalarFunctionBuilder builder(name);
 	callback(builder);
 
 	Register(loader, name, builder);
 }
 
-template <class CALLBACK>
-void FunctionBuilder::RegisterAggregate(ExtensionLoader &loader, const char *name, CALLBACK &&callback) {
+template <class CALLBACK_TYPE>
+void FunctionBuilder::RegisterAggregate(ExtensionLoader &loader, const char *name, CALLBACK_TYPE &&callback) {
 	AggregateFunctionBuilder builder(name);
 	callback(builder);
 	Register(loader, name, builder);
