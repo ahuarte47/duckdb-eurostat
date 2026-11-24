@@ -4,6 +4,8 @@
 
 require eurostat
 
+require httpfs
+
 query II
 SELECT
     code, value
