@@ -394,7 +394,7 @@ struct ES_Read {
 			}
 			url_count++;
 
-			auto response = HttpRequest::ExecuteHttpRequest(settings, data_url, "GET", HttpHeaders(), "", "");
+			auto response = HttpRequest::ExecuteHttpRequest(context, settings, data_url, "GET", HttpHeaders(), "", "");
 
 			if (response.content_type == "application/xml") {
 				std::string error_msg = EurostatUtils::GetXmlErrorMessage(response.body);

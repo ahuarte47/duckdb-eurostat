@@ -1,6 +1,11 @@
 {
         "dependencies": [
                 "openssl",
+                {
+                        "name": "curl",
+                        "default-features": false,
+                        "features": ["ssl"]
+                },
                 "libxml2"
         ],
         "vcpkg-configuration": {
